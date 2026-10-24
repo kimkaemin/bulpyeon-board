@@ -73,13 +73,17 @@ ol,ul{padding-left:20px}li{margin:6px 0}
 <main id="app"></main>
 </div>
 <div id="ov"><div class="modal" id="md" role="dialog" aria-modal="true"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 var CATS=["직장·학교","가족·친구","서비스·소비","교통·공공장소","기타"];
 var RX=[["a","😮‍💨 나도 그랬어요"],["b","🫂 속상했겠어요"],["c","🌱 읽고 응원해요"]];
 var REASONS=["개인정보(실명·연락처·주소 등)가 있어요","특정인을 괴롭히거나 위협해요","혐오 표현이 있어요","보복을 부추겨요","기타"];
-var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null;
+var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
+var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
+var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+var KEY="bulpyeon_v1",VOTER_KEY="bulpyeon_voter_v1",st=null,sort="new",cat="전체",openId=null,mem=null;
 function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
-function sv(){mem=st;try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+function sv(){mem=st}
 function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
 {id:1,t:"회의 끝나기 5분 전에 ‘잠깐만요’ 하는 사람",c:"퇴근 10분 전에 시작된 회의가 한 시간을 넘겼어요. 다들 말은 안 했지만 눈빛은 이미 집에 가 있었어요. 저만 이런 건 아니겠죠?",cat:"직장·학교",ts:n-3*h,r:{a:14,b:5,c:3},cm:[{id:2,t:"그 눈빛, 저도 알아요. 오늘은 맛있는 거 드세요.",ts:n-2*h,rp:[]}],rp:[]},
 {id:3,t:"배달 앱 별점은 5점인데 음식은 식어 있었어요",c:"비 오는 날 기다린 한 시간. 도착한 국물은 미지근했고 사과는 한마디도 없었어요. 따지기도 애매해서 그냥 먹었는데 계속 마음이 불편해요.",cat:"서비스·소비",ts:n-9*h,r:{a:9,b:11,c:2},cm:[],rp:[]},
@@ -123,18 +127,10 @@ function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기�
  +'<div class="box warn"><b>마음이 많이 힘들다면</b><p style="margin:6px 0 0">혼자 견디기 어려운 상황이라면 자살예방상담전화 109(24시간)나 정신건강상담전화 1577-0199에 연락해 보세요.</p></div>'
  +'<button class="btn" data-a="write">규칙을 확인했어요, 글쓰기</button>'}
 function admin(){
- var items=[];st.posts.forEach(function(p){if(p.rp.length||p.h)items.push({p:p});p.cm.forEach(function(c){if(c.rp.length||c.h)items.push({p:p,c:c})})});
- var h='<h2 class="pg">신고·관리</h2><p class="hint">신고가 접수된 글과 댓글을 확인해요. 이 화면은 체험용이라 현재 브라우저에 저장된 내용만 보여요.</p>';
- if(!items.length)return h+'<div class="empty">검토할 신고가 없어요. 오늘도 평화로워요.</div>';
- return h+items.map(function(i){var p=i.p,c=i.c,o=c||p,rp=o.rp;
-  var rs=rp.map(function(r){return esc(r)}).join(" / ")||"신고 내역 없음";
-  var state=o.h?"숨김 처리됨":(rp.length>=3&&!c?"임시로 가려짐":"공개 중");
-  return'<div class="box adm"><div class="meta"><span>'+(c?"댓글":"게시글")+' · '+esc(p.cat)+'</span><span>신고 '+rp.length+'건 · '+state+'</span></div>'
-  +(c?'<p class="hint" style="margin:6px 0 0">원글: '+esc(p.t)+'</p>':'')+'<p class="txt" style="margin:6px 0"><b>'+esc(c?c.t:p.t)+'</b>'+(c?'':'\n'+esc(p.c.slice(0,140)))+'</p>'
-  +'<p class="hint" style="margin:0">신고 사유: '+rs+'</p><div class="row" style="justify-content:flex-start;flex-wrap:wrap">'
-  +'<button class="btn sm ghost" data-a="ok" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>문제없음, 신고 해제</button>'
-  +'<button class="btn sm ghost" data-a="hide" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>'+(o.h?"숨김 해제":"숨기기")+'</button>'
-  +'<button class="btn sm" data-a="del" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>삭제</button></div></div>'}).join("")}
+ var h='<h2 class="pg">신고·관리</h2><p class="hint">신고 내역은 Supabase 대시보드의 board_reports에서 확인할 수 있어요. 운영자 권한을 웹페이지에 공개하지 않도록 조치 버튼은 운영자 전용 설정 후 연결합니다.</p>';
+ return h+'<div class="box"><b>공유 데이터베이스 연결됨</b><p style="margin:6px 0 0">현재 게시판에 표시된 글 '+st.posts.length+'개</p></div>'
+ +'<div class="box warn"><b>운영자 전용 관리</b><p style="margin:6px 0 0">게시글 숨김·삭제는 공개 페이지에서 누구나 실행할 수 없도록 잠겨 있어요. 신고 검토는 Supabase 대시보드에서 해주세요.</p></div>'
+ +'<a class="btn ghost" style="display:inline-block;text-decoration:none" href="https://supabase.com/dashboard/project/kgbsbjxowacybxzkggcj/editor">Supabase에서 게시글 관리</a>'}
 function modal(h){var o=document.getElementById("ov");document.getElementById("md").innerHTML=h;o.classList.add("on")}
 function closeM(){document.getElementById("ov").classList.remove("on")}
 function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">익명으로 올라가요. 마음 편히 써주세요.</p>'
@@ -146,32 +142,51 @@ function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">�
  +'<div class="err" id="we"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="post">올리기</button></div>')}
 function rp(id,cid){modal('<h2>신고하기</h2><p class="hint">운영자가 확인할 수 있도록 이유를 알려주세요.</p><label for="rr">신고 사유</label><select id="rr">'+REASONS.map(function(r){return'<option>'+r+'</option>'}).join("")+'</select><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="sendrep" data-id="'+id+'"'+(cid?' data-c="'+cid+'"':'')+'>신고 접수</button></div>')}
 function fp(id){return st.posts.filter(function(p){return p.id==id})[0]}
-document.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
+function voter(){try{var v=localStorage.getItem(VOTER_KEY);if(!v){v=crypto.randomUUID();localStorage.setItem(VOTER_KEY,v)}return v}catch(e){return"visitor"}}
+function reportMap(rows,key){var out={};rows.forEach(function(r){var k=key(r);(out[k]||(out[k]=[])).push(r.reason)});return out}
+async function refresh(){
+ var results=await Promise.all([
+  sb.from("board_posts").select("*").order("created_at",{ascending:false}),
+  sb.from("board_comments").select("*").order("created_at"),
+  sb.from("board_reactions").select("*")
+ ]);
+ var err=results.filter(function(x){return x.error})[0];if(err)throw err.error;
+ var comments=results[1].data||[],reactions=results[2].data||[];
+ var my={},posts=(results[0].data||[]).map(function(row){var p={id:row.id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
+  reactions.filter(function(r){return r.post_id===row.id}).forEach(function(r){p.r[r.reaction]++;if(r.voter_key===voter())my[p.id+r.reaction]=1});
+  p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
+ st={n:0,my:my,posts:posts};render();
+}
+function dbError(err){console.error("Supabase request failed",err);toast("연결 오류: Supabase 설정과 테이블을 확인해 주세요.")}
+async function send(action){try{await action();await refresh();return true}catch(err){dbError(err);return false}}
+document.addEventListener("click",async function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
  var a=b.dataset.a,id=b.dataset.id,cid=b.dataset.c,p=id?fp(id):null;
  if(a==="x"){closeM();return}
  if(a==="write"){wr();return}
  if(a==="cat"){cat=b.dataset.v}
  else if(a==="sort"){sort=b.dataset.v}
  else if(a==="open"){openId=openId==p.id?null:p.id}
- else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v;if(st.my[k]){delete st.my[k];p.r[v]--}else{st.my[k]=1;p.r[v]++}sv()}
+ else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v;await send(async function(){if(st.my[k]){var d=await sb.from("board_reactions").delete().eq("post_id",p.id).eq("reaction",v).eq("voter_key",voter());if(d.error)throw d.error}else{var q=await sb.from("board_reactions").insert({post_id:p.id,reaction:v,voter_key:voter()});if(q.error)throw q.error}})}
  else if(a==="rep"){rp(id,cid);return}
- else if(a==="sendrep"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.rp.push(document.getElementById("rr").value);sv();closeM();toast("신고가 접수되었어요. 운영자가 확인할게요.")}
+ else if(a==="sendrep"){var reason=document.getElementById("rr").value;var q=await send(async function(){var x=await sb.from("board_reports").insert({post_id:id,comment_id:cid||null,reason:reason});if(x.error)throw x.error});if(q){closeM();toast("신고가 접수됐어요. 운영자가 검토할게요.")}}
  else if(a==="cmt"){var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
   if(t.length<2){er.textContent="댓글을 입력해 주세요.";return}
   var m=pii(t);if(m){er.textContent=m;return}
-  p.cm.push({id:st.n++,t:t,ts:Date.now(),rp:[]});sv();toast("따뜻한 댓글이 등록되었어요.")}
+  if(await send(async function(){var x=await sb.from("board_comments").insert({post_id:id,body:t});if(x.error)throw x.error}))toast("따뜻한 댓글이 등록되었어요.")}
  else if(a==="post"){var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
   if(!t||c.length<10){er.textContent="제목과 내용을 입력해 주세요. 내용은 10자 이상 적어주세요.";return}
   var m=pii(t+" "+c);if(m){er.textContent=m;return}
   if(!document.getElementById("wa").checked){er.textContent="글을 올리려면 이용 규칙에 동의해 주세요.";return}
-  st.posts.unshift({id:st.n++,t:t,c:c,cat:document.getElementById("wc").value,ts:Date.now(),r:{a:0,b:0,c:0},cm:[],rp:[]});sv();closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}
- else if(a==="ok"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.rp=[];o.h=false;sv()}
- else if(a==="hide"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.h=!o.h;sv()}
- else if(a==="del"){if(!confirm("정말 삭제할까요? 되돌릴 수 없어요."))return;if(cid)p.cm=p.cm.filter(function(c){return c.id!=cid});else st.posts=st.posts.filter(function(x){return x.id!=p.id});sv()}
+  if(await send(async function(){var x=await sb.from("board_posts").insert({title:t,body:c,category:document.getElementById("wc").value});if(x.error)throw x.error})){closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}}
+ else if(a==="ok"||a==="hide"||a==="del"){toast("운영자 권한이 필요한 기능이에요. Supabase 대시보드에서 처리해 주세요.")}
  render()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
 window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
-st=ld()||seed();sv();render();
+st={n:0,my:{},posts:[]};render();refresh().catch(function(e){dbError(e)});
+sb.channel("board-live-updates").on("postgres_changes",{event:"*",schema:"public",table:"board_posts"},function(){refresh().catch(dbError)})
+ .on("postgres_changes",{event:"*",schema:"public",table:"board_comments"},function(){refresh().catch(dbError)})
+ .on("postgres_changes",{event:"*",schema:"public",table:"board_reactions"},function(){refresh().catch(dbError)})
+ .subscribe();
 </script>
 </body>
 </html>
