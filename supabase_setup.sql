@@ -20,8 +20,11 @@ create table if not exists public.board_comments (
   post_id uuid not null references public.board_posts(id) on delete cascade,
   body text not null check (char_length(body) between 2 and 300),
   created_at timestamptz not null default now(),
-  hidden boolean not null default false
+  hidden boolean not null default false,
+  author_id uuid not null default auth.uid()
 );
+
+alter table public.board_comments add column if not exists author_id uuid default auth.uid();
 
 create table if not exists public.board_reactions (
   id uuid primary key default gen_random_uuid(),
@@ -55,7 +58,10 @@ create policy "Authors can delete their own posts" on public.board_posts for del
 drop policy if exists "Anyone can read visible comments" on public.board_comments;
 create policy "Anyone can read visible comments" on public.board_comments for select to anon, authenticated using (hidden = false);
 drop policy if exists "Anyone can write comments" on public.board_comments;
-create policy "Anyone can write comments" on public.board_comments for insert to anon, authenticated with check (true);
+drop policy if exists "Signed-in visitors can write comments" on public.board_comments;
+create policy "Signed-in visitors can write comments" on public.board_comments for insert to authenticated with check (auth.uid() = author_id);
+drop policy if exists "Authors can delete their own comments" on public.board_comments;
+create policy "Authors can delete their own comments" on public.board_comments for delete to authenticated using (auth.uid() = author_id);
 
 drop policy if exists "Anyone can read reactions" on public.board_reactions;
 create policy "Anyone can read reactions" on public.board_reactions for select to anon, authenticated using (true);
@@ -76,7 +82,8 @@ create index if not exists board_reports_post_idx on public.board_reports (post_
 grant select on public.board_posts to anon, authenticated;
 grant insert, delete on public.board_posts to authenticated;
 grant select on public.board_comments to anon, authenticated;
-grant insert on public.board_comments to authenticated;
+grant insert, delete on public.board_comments to authenticated;
+revoke insert, delete on public.board_comments from anon;
 grant select, insert, delete on public.board_reactions to authenticated;
 grant select on public.board_reactions to anon;
 revoke delete on public.board_reactions from anon;
