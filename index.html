@@ -143,10 +143,10 @@ function authModal(mode,email){
  var title=mode==="password"?"비밀번호 설정":mode==="signup"?"회원가입":"로그인";
  if(mode==="account"){modal('<h2>로그인된 계정</h2><p class="hint">'+esc(currentUserEmail)+'</p><div class="row"><button class="btn ghost" data-a="x">닫기</button><button class="btn ghost" data-a="authmode" data-v="password">비밀번호 설정·변경</button><button class="btn" data-a="authout">로그아웃</button></div>');return}
  var switcher=mode==="password"?'':'<div class="chips" style="margin:12px 0"><button class="chip '+(mode==="login"?"on":"")+'" data-a="authmode" data-v="login">로그인</button><button class="chip '+(mode==="signup"?"on":"")+'" data-a="authmode" data-v="signup">회원가입</button></div>';
- var body=mode==="signup"?'<p class="hint">먼저 이메일을 인증하면, 이 기기에서 비밀번호를 설정할 수 있어요. 기존에 익명으로 쓴 글과 댓글도 그대로 유지됩니다.</p><label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">'
+ var body=mode==="signup"?'<p class="hint">이메일 인증 메일 없이 가입해요. 이메일 주소가 실제 본인 것인지 확인하지 않으니, 비밀번호를 잊었을 때 복구하기 어려울 수 있어요. 기존에 익명으로 쓴 글과 댓글은 그대로 유지됩니다.</p><label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com"><label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="new-password" minlength="8" placeholder="8자 이상"><label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">'
   :'<p class="hint">'+(mode==="password"?"이메일 인증이 끝났어요. 사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
    +'<label for="ap">비밀번호'+(mode==="password"?'':'')+'</label><input id="ap" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" minlength="8" placeholder="8자 이상">'+(mode==="password"?'<label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">':'');
- var action=mode==="signup"?"인증 메일 보내기":mode==="password"?"비밀번호 저장":"로그인";
+ var action=mode==="signup"?"가입하기":mode==="password"?"비밀번호 저장":"로그인";
  modal('<h2>'+title+'</h2>'+switcher+body+'<div class="err" id="aeerr" aria-live="polite"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="authsubmit" data-v="'+mode+'">'+action+'</button></div>')
 }
 function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
@@ -187,11 +187,13 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
  if(a==="authsubmit"){
   if(authBusy)return;var mode=b.dataset.v,email=(mode==="password"?currentUserEmail:(document.getElementById("ae")||{}).value||"").trim().toLowerCase(),pass=(document.getElementById("ap")||{}).value||"",errBox=document.getElementById("aeerr");
   if(mode!=="password"&&(!email||!/^\S+@\S+\.\S+$/.test(email))){errBox.textContent="올바른 이메일 주소를 입력해 주세요.";return}
-  if(mode==="signup"){authBusy=true;b.disabled=true;try{var linked=await sb.auth.updateUser({email:email},{emailRedirectTo:SITE_URL});if(linked.error)throw linked.error;try{localStorage.setItem("painboard_pending_email",email)}catch(e){};authModal("verify",email)}catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return}
+  if(mode==="signup"&&pass.length<8){errBox.textContent="비밀번호는 8자 이상으로 입력해 주세요.";return}
+  if(mode==="signup"&&pass!==((document.getElementById("ap2")||{}).value||"")){errBox.textContent="비밀번호가 서로 달라요.";return}
   if(pass.length<8){errBox.textContent="비밀번호는 8자 이상으로 입력해 주세요.";return}
   if(mode==="password"&&pass!==((document.getElementById("ap2")||{}).value||"")){errBox.textContent="비밀번호가 서로 달라요.";return}
   authBusy=true;b.disabled=true;try{
    if(mode==="login"){var signed=await sb.auth.signInWithPassword({email:email,password:pass});if(signed.error)throw signed.error;setUserSession(signed.data.session);await refresh();closeM();toast("로그인했어요.")}
+   else if(mode==="signup"){var linked=await sb.auth.updateUser({email:email});if(linked.error)throw linked.error;var passwordSet=await sb.auth.updateUser({password:pass});if(passwordSet.error)throw passwordSet.error;try{localStorage.removeItem("painboard_pending_email")}catch(e){};var sessionResult=await sb.auth.getSession();setUserSession(sessionResult.data.session);await refresh();closeM();toast("가입이 완료됐어요.")}
    else {var changed=await sb.auth.updateUser({password:pass});if(changed.error)throw changed.error;try{localStorage.removeItem("painboard_pending_email")}catch(e){};var sessionResult=await sb.auth.getSession();setUserSession(sessionResult.data.session);await refresh();closeM();toast("비밀번호가 저장됐어요.")}
   }catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return
  }
