@@ -81,7 +81,7 @@ var REASONS=["개인정보(실명·연락처·주소 등)가 있어요","특정�
 var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
 var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null;
+var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null,posting=false,postCooldownUntil=0;
 function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
 function sv(){mem=st}
 function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
@@ -174,11 +174,12 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
   if(t.length<2){er.textContent="댓글을 입력해 주세요.";return}
   var m=pii(t);if(m){er.textContent=m;return}
   if(await send(async function(){var x=await sb.from("board_comments").insert({post_id:id,body:t});if(x.error)throw x.error}))toast("따뜻한 댓글이 등록되었어요.")}
- else if(a==="post"){var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
+ else if(a==="post"){if(posting||Date.now()<postCooldownUntil)return;var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
   if(!t||c.length<10){er.textContent="제목과 내용을 입력해 주세요. 내용은 10자 이상 적어주세요.";return}
   var m=pii(t+" "+c);if(m){er.textContent=m;return}
   if(!document.getElementById("wa").checked){er.textContent="글을 올리려면 이용 규칙에 동의해 주세요.";return}
-  if(await send(async function(){var x=await sb.from("board_posts").insert({title:t,body:c,category:document.getElementById("wc").value});if(x.error)throw x.error})){closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}}
+  posting=true;b.disabled=true;var didPost=await send(async function(){var x=await sb.from("board_posts").insert({title:t,body:c,category:document.getElementById("wc").value});if(x.error)throw x.error});posting=false;
+  if(didPost){postCooldownUntil=Date.now()+2500;closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}else b.disabled=false}
  else if(a==="ok"||a==="hide"||a==="del"){toast("운영자 권한이 필요한 기능이에요. Supabase 대시보드에서 처리해 주세요.")}
  render()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
