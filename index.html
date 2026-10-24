@@ -19,6 +19,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Gowun Dodum","A
 nav{display:flex;gap:6px;justify-content:flex-end;padding:14px 0 0}
 nav a{padding:6px 12px;border-radius:99px;color:var(--sub);text-decoration:none;font-size:14px}
 nav a.on{background:var(--ink);color:var(--bg)}
+.auth-nav{padding:6px 12px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
 a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #4a8cf0;outline-offset:2px}
 .hero{padding:28px 0 18px}
 h1{margin:0;font-size:clamp(40px,11vw,60px);line-height:1.1;font-weight:400;letter-spacing:-.03em}
@@ -80,8 +81,9 @@ var RX=[["a","😮‍💨 나도 그랬어요"],["b","🫂 속상했겠어요"],
 var REASONS=["개인정보(실명·연락처·주소 등)가 있어요","특정인을 괴롭히거나 위협해요","혐오 표현이 있어요","보복을 부추겨요","기타"];
 var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
 var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
+var SITE_URL="https://kimkaemin.github.io/bulpyeon-board/";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={};
+var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
 function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
 function sv(){mem=st}
 function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
@@ -102,7 +104,10 @@ function pii(s){
  if(/죽여\s?(버|야|주)|신상\s?(을\s)?(털|공개)|찾아가서|가만\s?안\s?둬/.test(s))return"위협이나 보복을 떠올리게 하는 표현이 있어요. 내 마음이 어땠는지 중심으로 바꿔 써주세요.";
  return""}
 function nav(){var h=location.hash.replace("#","")||"home";
- document.getElementById("nav").innerHTML=[["home","게시판"],["rules","이용 규칙"],["admin","신고·관리"]].map(function(x){return'<a href="#'+(x[0]==="home"?"":x[0])+'" class="'+(h===x[0]?"on":"")+'">'+x[1]+'</a>'}).join("")}
+ var links=[["home","게시판"],["rules","이용 규칙"],["admin","신고·관리"]].map(function(x){return'<a href="#'+(x[0]==="home"?"":x[0])+'" class="'+(h===x[0]?"on":"")+'">'+x[1]+'</a>'}).join("");
+ var pending="";try{pending=localStorage.getItem("painboard_pending_email")}catch(e){}
+ var auth=currentUserId&&!currentIsAnonymous?'<button class="auth-nav" data-a="auth">'+(pending?"비밀번호 설정":esc(currentUserEmail||"내 계정"))+'</button><button class="auth-nav" data-a="authout">로그아웃</button>':'<button class="auth-nav" data-a="auth">로그인 · 회원가입</button>';
+ document.getElementById("nav").innerHTML=links+auth}
 function render(){nav();var h=location.hash.replace("#","")||"home",a=document.getElementById("app");
  a.innerHTML=h==="rules"?rules():h==="admin"?admin():home();window.scrollTo&&0}
 function home(){
@@ -133,6 +138,20 @@ function admin(){
  +'<a class="btn ghost" style="display:inline-block;text-decoration:none" href="https://supabase.com/dashboard/project/kgbsbjxowacybxzkggcj/editor">Supabase에서 게시글 관리</a>'}
 function modal(h){var o=document.getElementById("ov");document.getElementById("md").innerHTML=h;o.classList.add("on")}
 function closeM(){document.getElementById("ov").classList.remove("on")}
+function authModal(mode,email){
+ if(mode==="verify"){modal('<h2>메일을 확인해 주세요</h2><p class="hint">'+esc(email||"")+' 주소로 인증 링크를 보냈어요. 메일을 확인하고 이 브라우저에서 링크를 열면 기존 글과 댓글이 계정에 연결됩니다. 메일이 안 보이면 스팸함도 확인해 주세요.</p><div class="row"><button class="btn" data-a="x">확인</button></div>');return}
+ var title=mode==="password"?"비밀번호 설정":mode==="signup"?"회원가입":"로그인";
+ if(mode==="account"){modal('<h2>로그인된 계정</h2><p class="hint">'+esc(currentUserEmail)+'</p><div class="row"><button class="btn ghost" data-a="x">닫기</button><button class="btn ghost" data-a="authmode" data-v="password">비밀번호 설정·변경</button><button class="btn" data-a="authout">로그아웃</button></div>');return}
+ var switcher=mode==="password"?'':'<div class="chips" style="margin:12px 0"><button class="chip '+(mode==="login"?"on":"")+'" data-a="authmode" data-v="login">로그인</button><button class="chip '+(mode==="signup"?"on":"")+'" data-a="authmode" data-v="signup">회원가입</button></div>';
+ var body=mode==="signup"?'<p class="hint">먼저 이메일을 인증하면, 이 기기에서 비밀번호를 설정할 수 있어요. 기존에 익명으로 쓴 글과 댓글도 그대로 유지됩니다.</p><label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">'
+  :'<p class="hint">'+(mode==="password"?"이메일 인증이 끝났어요. 사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
+   +'<label for="ap">비밀번호'+(mode==="password"?'':'')+'</label><input id="ap" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" minlength="8" placeholder="8자 이상">'+(mode==="password"?'<label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">':'');
+ var action=mode==="signup"?"인증 메일 보내기":mode==="password"?"비밀번호 저장":"로그인";
+ modal('<h2>'+title+'</h2>'+switcher+body+'<div class="err" id="aeerr" aria-live="polite"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="authsubmit" data-v="'+mode+'">'+action+'</button></div>')
+}
+function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
+function setUserSession(session){var u=session&&session.user;currentUserId=u?u.id:null;currentUserEmail=u&&u.email||"";currentIsAnonymous=!u||!!u.is_anonymous}
+function pendingEmail(){try{return localStorage.getItem("painboard_pending_email")}catch(e){return""}}
 function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">익명으로 올라가요. 마음 편히 써주세요.</p>'
  +'<div class="box warn" style="font-size:14px;margin:10px 0"><b>올리기 전에 확인해 주세요</b><ul style="margin:6px 0 0"><li>실명, 전화번호, 주소, 계정 정보는 쓰지 마세요.</li><li>상대의 이름이나 알아볼 만한 세부 정보는 “상사”, “손님”처럼 바꿔 쓰거나 빼주세요.</li><li>특정인을 괴롭히거나 위협하는 글, 혐오 표현, 보복을 부추기는 글은 올릴 수 없어요.</li></ul></div>'
  +'<label for="wc">상황 분류</label><select id="wc">'+CATS.map(function(c){return'<option>'+c+'</option>'}).join("")+'</select>'
@@ -162,6 +181,20 @@ async function send(action){try{await action();await refresh();return true}catch
 document.addEventListener("click",async function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
  var a=b.dataset.a,id=b.dataset.id,cid=b.dataset.c,p=id?fp(id):null;
  if(a==="x"){closeM();return}
+ if(a==="auth"){var pending=pendingEmail();authModal(pending&&currentUserId&&!currentIsAnonymous?"password":currentIsAnonymous?"login":"account",pending||currentUserEmail);return}
+ if(a==="authmode"){authModal(b.dataset.v);return}
+ if(a==="authout"){if(authBusy)return;if(!confirm("로그아웃할까요?"))return;authBusy=true;try{await sb.auth.signOut();var anon=await sb.auth.signInAnonymously();if(anon.error)throw anon.error;setUserSession(anon.data.session);await refresh();closeM();toast("로그아웃했어요.")}catch(err){toast(authMessage(err))}finally{authBusy=false}return}
+ if(a==="authsubmit"){
+  if(authBusy)return;var mode=b.dataset.v,email=(mode==="password"?currentUserEmail:(document.getElementById("ae")||{}).value||"").trim().toLowerCase(),pass=(document.getElementById("ap")||{}).value||"",errBox=document.getElementById("aeerr");
+  if(mode!=="password"&&(!email||!/^\S+@\S+\.\S+$/.test(email))){errBox.textContent="올바른 이메일 주소를 입력해 주세요.";return}
+  if(mode==="signup"){authBusy=true;b.disabled=true;try{var linked=await sb.auth.updateUser({email:email},{emailRedirectTo:SITE_URL});if(linked.error)throw linked.error;try{localStorage.setItem("painboard_pending_email",email)}catch(e){};authModal("verify",email)}catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return}
+  if(pass.length<8){errBox.textContent="비밀번호는 8자 이상으로 입력해 주세요.";return}
+  if(mode==="password"&&pass!==((document.getElementById("ap2")||{}).value||"")){errBox.textContent="비밀번호가 서로 달라요.";return}
+  authBusy=true;b.disabled=true;try{
+   if(mode==="login"){var signed=await sb.auth.signInWithPassword({email:email,password:pass});if(signed.error)throw signed.error;setUserSession(signed.data.session);await refresh();closeM();toast("로그인했어요.")}
+   else {var changed=await sb.auth.updateUser({password:pass});if(changed.error)throw changed.error;try{localStorage.removeItem("painboard_pending_email")}catch(e){};var sessionResult=await sb.auth.getSession();setUserSession(sessionResult.data.session);await refresh();closeM();toast("비밀번호가 저장됐어요.")}
+  }catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return
+ }
  if(a==="write"){wr();return}
  if(a==="cat"){cat=b.dataset.v}
  else if(a==="sort"){sort=b.dataset.v}
@@ -187,7 +220,7 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
 window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
 st={n:0,my:{},posts:[]};render();
-async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}currentUserId=session.user.id;await refresh()}
+async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();var pending=pendingEmail();if(pending&&session.user&&!session.user.is_anonymous&&session.user.email&&session.user.email.toLowerCase()===pending.toLowerCase())setTimeout(function(){authModal("password",pending)},250)}
 startBoard().catch(function(e){dbError(e)});
 sb.channel("board-live-updates").on("postgres_changes",{event:"*",schema:"public",table:"board_posts"},function(){refresh().catch(dbError)})
  .on("postgres_changes",{event:"*",schema:"public",table:"board_comments"},function(){refresh().catch(dbError)})
