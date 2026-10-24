@@ -9,8 +9,11 @@ create table if not exists public.board_posts (
   body text not null check (char_length(body) between 10 and 1000),
   category text not null check (category in ('직장·학교','가족·친구','서비스·소비','교통·공공장소','기타')),
   created_at timestamptz not null default now(),
-  hidden boolean not null default false
+  hidden boolean not null default false,
+  author_id uuid not null default auth.uid()
 );
+
+alter table public.board_posts add column if not exists author_id uuid default auth.uid();
 
 create table if not exists public.board_comments (
   id uuid primary key default gen_random_uuid(),
@@ -45,7 +48,9 @@ alter table public.board_reports enable row level security;
 drop policy if exists "Anyone can read visible posts" on public.board_posts;
 create policy "Anyone can read visible posts" on public.board_posts for select to anon, authenticated using (hidden = false);
 drop policy if exists "Anyone can publish posts" on public.board_posts;
-create policy "Anyone can publish posts" on public.board_posts for insert to anon, authenticated with check (true);
+create policy "Signed-in visitors can publish posts" on public.board_posts for insert to authenticated with check (auth.uid() = author_id);
+drop policy if exists "Authors can delete their own posts" on public.board_posts;
+create policy "Authors can delete their own posts" on public.board_posts for delete to authenticated using (auth.uid() = author_id);
 
 drop policy if exists "Anyone can read visible comments" on public.board_comments;
 create policy "Anyone can read visible comments" on public.board_comments for select to anon, authenticated using (hidden = false);
@@ -55,8 +60,10 @@ create policy "Anyone can write comments" on public.board_comments for insert to
 drop policy if exists "Anyone can read reactions" on public.board_reactions;
 create policy "Anyone can read reactions" on public.board_reactions for select to anon, authenticated using (true);
 drop policy if exists "Anyone can react" on public.board_reactions;
-create policy "Anyone can react" on public.board_reactions for insert to anon, authenticated with check (true);
+create policy "Signed-in visitors can react" on public.board_reactions for insert to authenticated with check (voter_key = auth.uid()::text);
 drop policy if exists "Anyone can remove their browser reaction" on public.board_reactions;
+drop policy if exists "Visitors can remove their own reaction" on public.board_reactions;
+create policy "Visitors can remove their own reaction" on public.board_reactions for delete to authenticated using (voter_key = auth.uid()::text);
 
 drop policy if exists "Anyone can submit reports" on public.board_reports;
 create policy "Anyone can submit reports" on public.board_reports for insert to anon, authenticated with check (true);
@@ -66,10 +73,13 @@ create index if not exists board_comments_post_created_idx on public.board_comme
 create index if not exists board_reactions_post_idx on public.board_reactions (post_id);
 create index if not exists board_reports_post_idx on public.board_reports (post_id, created_at desc);
 
-grant select, insert on public.board_posts to anon, authenticated;
-grant select, insert on public.board_comments to anon, authenticated;
-grant select, insert on public.board_reactions to anon, authenticated;
-revoke delete on public.board_reactions from anon, authenticated;
+grant select on public.board_posts to anon, authenticated;
+grant insert, delete on public.board_posts to authenticated;
+grant select on public.board_comments to anon, authenticated;
+grant insert on public.board_comments to authenticated;
+grant select, insert, delete on public.board_reactions to authenticated;
+grant select on public.board_reactions to anon;
+revoke delete on public.board_reactions from anon;
 grant insert on public.board_reports to anon, authenticated;
 
 do $$ begin

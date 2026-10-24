@@ -81,7 +81,7 @@ var REASONS=["개인정보(실명·연락처·주소 등)가 있어요","특정�
 var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
 var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-var KEY="bulpyeon_v1",VOTER_KEY="bulpyeon_voter_v1",st=null,sort="new",cat="전체",openId=null,mem=null;
+var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null;
 function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
 function sv(){mem=st}
 function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
@@ -115,7 +115,7 @@ function home(){
 function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h});
  var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
  +'<div class="rx">'+RX.map(function(r){return'<button class="'+(st.my[p.id+r[0]]?"me":"")+'" data-a="rx" data-id="'+p.id+'" data-v="'+r[0]+'" aria-pressed="'+!!st.my[p.id+r[0]]+'">'+r[1]+" "+p.r[r[0]]+'</button>'}).join("")+'</div>'
- +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button></div>';
+ +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button>'+(currentUserId&&p.author_id===currentUserId?'<button class="lnk" data-a="deletepost" data-id="'+p.id+'">삭제</button>':'')+'</div>';
  if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>익명 · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button></small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
  +'<label for="cmt'+p.id+'">위로와 공감의 말을 남겨주세요</label><textarea id="cmt'+p.id+'" maxlength="300" placeholder="예) 정말 속상했겠어요. 오늘은 푹 쉬세요."></textarea><div class="err" id="ce'+p.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="cmt" data-id="'+p.id+'">댓글 남기기</button></div></div>'}
  return s+'</article>'}
@@ -142,7 +142,7 @@ function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">�
  +'<div class="err" id="we"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="post">올리기</button></div>')}
 function rp(id,cid){modal('<h2>신고하기</h2><p class="hint">운영자가 확인할 수 있도록 이유를 알려주세요.</p><label for="rr">신고 사유</label><select id="rr">'+REASONS.map(function(r){return'<option>'+r+'</option>'}).join("")+'</select><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="sendrep" data-id="'+id+'"'+(cid?' data-c="'+cid+'"':'')+'>신고 접수</button></div>')}
 function fp(id){return st.posts.filter(function(p){return p.id==id})[0]}
-function voter(){try{var v=localStorage.getItem(VOTER_KEY);if(!v){v=crypto.randomUUID();localStorage.setItem(VOTER_KEY,v)}return v}catch(e){return"visitor"}}
+function voter(){return currentUserId}
 function reportMap(rows,key){var out={};rows.forEach(function(r){var k=key(r);(out[k]||(out[k]=[])).push(r.reason)});return out}
 async function refresh(){
  var results=await Promise.all([
@@ -152,7 +152,7 @@ async function refresh(){
  ]);
  var err=results.filter(function(x){return x.error})[0];if(err)throw err.error;
  var comments=results[1].data||[],reactions=results[2].data||[];
- var my={},posts=(results[0].data||[]).map(function(row){var p={id:row.id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
+ var my={},posts=(results[0].data||[]).map(function(row){var p={id:row.id,author_id:row.author_id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
   reactions.filter(function(r){return r.post_id===row.id}).forEach(function(r){p.r[r.reaction]++;if(r.voter_key===voter())my[p.id+r.reaction]=1});
   p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
  st={n:0,my:my,posts:posts};render();
@@ -166,7 +166,8 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
  if(a==="cat"){cat=b.dataset.v}
  else if(a==="sort"){sort=b.dataset.v}
  else if(a==="open"){openId=openId==p.id?null:p.id}
- else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v;if(st.my[k]){toast("이 브라우저에서는 이미 공감했어요.")}else if(await send(async function(){var q=await sb.from("board_reactions").insert({post_id:p.id,reaction:v,voter_key:voter()});if(q.error)throw q.error}))toast("공감이 전달됐어요.")}
+ else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v;if(!currentUserId){toast("잠시 후 다시 눌러주세요.")}else if(await send(async function(){var q=st.my[k]?await sb.from("board_reactions").delete().eq("post_id",p.id).eq("reaction",v).eq("voter_key",voter()):await sb.from("board_reactions").insert({post_id:p.id,reaction:v,voter_key:voter()});if(q.error)throw q.error}))toast(st.my[k]?"공감을 취소했어요.":"공감이 전달됐어요.")}
+ else if(a==="deletepost"){if(!p||p.author_id!==currentUserId){toast("작성자만 글을 삭제할 수 있어요.")}else if(confirm("정말 이 글을 삭제할까요? 댓글과 공감도 함께 삭제돼요.")){if(await send(async function(){var x=await sb.from("board_posts").delete().eq("id",p.id);if(x.error)throw x.error})){openId=null;toast("글을 삭제했어요.")}}}
  else if(a==="rep"){rp(id,cid);return}
  else if(a==="sendrep"){var reason=document.getElementById("rr").value;var q=await send(async function(){var x=await sb.from("board_reports").insert({post_id:id,comment_id:cid||null,reason:reason});if(x.error)throw x.error});if(q){closeM();toast("신고가 접수됐어요. 운영자가 검토할게요.")}}
  else if(a==="cmt"){var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
@@ -182,7 +183,9 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
  render()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
 window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
-st={n:0,my:{},posts:[]};render();refresh().catch(function(e){dbError(e)});
+st={n:0,my:{},posts:[]};render();
+async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}currentUserId=session.user.id;await refresh()}
+startBoard().catch(function(e){dbError(e)});
 sb.channel("board-live-updates").on("postgres_changes",{event:"*",schema:"public",table:"board_posts"},function(){refresh().catch(dbError)})
  .on("postgres_changes",{event:"*",schema:"public",table:"board_comments"},function(){refresh().catch(dbError)})
  .on("postgres_changes",{event:"*",schema:"public",table:"board_reactions"},function(){refresh().catch(dbError)})
