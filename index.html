@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>불편한 게시판</title>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef3f8;--ink:#26324a;--sub:#5d6b85;--card:#fff;--line:#d5deea;--btn:#26324a;--btnt:#fff;--hl:#ffd66b;
+--c1:#fff1bd;--c2:#ffd9e0;--c3:#cdeedd;--c4:#d3e6fb;--c5:#e4dcfa;--err:#b3261e;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171d2b;--ink:#eaf0fb;--sub:#a5b2cb;--card:#222b3f;--line:#37425c;--btn:#ffd66b;--btnt:#1b2233;
+--c1:#4a4222;--c2:#4d2f38;--c3:#27453a;--c4:#27405c;--c5:#3d3560;--err:#ff8a80}}
+:root[data-theme="dark"]{--bg:#171d2b;--ink:#eaf0fb;--sub:#a5b2cb;--card:#222b3f;--line:#37425c;--btn:#ffd66b;--btnt:#1b2233;--c1:#4a4222;--c2:#4d2f38;--c3:#27453a;--c4:#27405c;--c5:#3d3560;--err:#ff8a80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;line-height:1.65;font-size:16px}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 64px}
+nav{display:flex;gap:6px;justify-content:flex-end;padding:14px 0 0}
+nav a{padding:6px 12px;border-radius:99px;color:var(--sub);text-decoration:none;font-size:14px}
+nav a.on{background:var(--ink);color:var(--bg)}
+a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #4a8cf0;outline-offset:2px}
+.hero{padding:28px 0 18px}
+h1{margin:0;font-size:clamp(40px,11vw,60px);line-height:1.1;font-weight:400;letter-spacing:-.03em}
+h1 span{background:linear-gradient(transparent 58%,var(--hl) 58%);padding:0 4px}
+.hero p{margin:10px 0 0;color:var(--sub);font-size:18px}
+.btn{border:0;background:var(--btn);color:var(--btnt);font:inherit;padding:11px 20px;border-radius:12px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.sm{padding:5px 12px;font-size:14px}
+.btn.big{font-size:18px;padding:13px 26px;margin-top:18px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:18px 0 12px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;max-width:100%}
+.chip{flex:none;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px;padding:5px 13px;border-radius:99px;cursor:pointer}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.note{position:relative;border-radius:6px 6px 14px 6px;padding:16px 18px 12px;margin:0 0 14px;border:1px solid rgba(0,0,0,.06)}
+.cat1{background:var(--c1)}.cat2{background:var(--c2)}.cat3{background:var(--c3)}.cat4{background:var(--c4)}.cat5{background:var(--c5)}
+.meta{display:flex;justify-content:space-between;font-size:13px;color:var(--sub)}
+.note h3{margin:6px 0 4px;font-size:20px;font-weight:400;line-height:1.4}
+.txt{margin:0;white-space:pre-wrap;word-break:break-word}
+.clamp{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.rx{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.rx button,.lnk{font:inherit;font-size:14px;border:1px solid rgba(0,0,0,.14);background:rgba(255,255,255,.6);color:#26324a;border-radius:99px;padding:4px 11px;cursor:pointer}
+.rx button.me{background:#26324a;color:#fff}
+.foot{display:flex;justify-content:space-between;margin-top:8px;font-size:14px}
+.lnk{border:0;background:none;color:var(--sub);padding:2px 4px;text-decoration:underline}
+.cm{margin-top:10px;border-top:1px dashed rgba(0,0,0,.2);padding-top:10px}
+.cmi{background:rgba(255,255,255,.65);color:#26324a;border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:15px}
+.cmi small{display:block;color:#5d6b85}
+.hid{opacity:.6;font-style:italic}
+input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+textarea{resize:vertical;min-height:90px}
+label{display:block;margin:12px 0 4px;font-size:15px}
+.hint{font-size:13px;color:var(--sub)}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0}
+.box.warn{border-left:6px solid var(--hl)}
+.err{color:var(--err);font-size:14px;min-height:20px;margin:6px 0 0}
+#ov{position:fixed;inset:0;background:rgba(10,15,30,.55);display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 12px;z-index:20}
+#ov.on{display:flex}
+.modal{background:var(--bg);width:100%;max-width:560px;border-radius:18px;padding:20px;margin:auto}
+.modal h2{margin:0 0 4px;font-weight:400;font-size:24px}
+.row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.empty{text-align:center;color:var(--sub);padding:36px 0}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-size:15px;z-index:30}
+h2.pg{font-weight:400;font-size:30px;margin:26px 0 6px}
+ol,ul{padding-left:20px}li{margin:6px 0}
+.adm{border-left:6px solid var(--err)}
+@media (prefers-reduced-motion:no-preference){.note{transition:transform .15s}.note:hover{transform:rotate(-.4deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav id="nav"></nav>
+<main id="app"></main>
+</div>
+<div id="ov"><div class="modal" id="md" role="dialog" aria-modal="true"></div></div>
+<script>
+var CATS=["직장·학교","가족·친구","서비스·소비","교통·공공장소","기타"];
+var RX=[["a","😮‍💨 나도 그랬어요"],["b","🫂 속상했겠어요"],["c","🌱 읽고 응원해요"]];
+var REASONS=["개인정보(실명·연락처·주소 등)가 있어요","특정인을 괴롭히거나 위협해요","혐오 표현이 있어요","보복을 부추겨요","기타"];
+var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null;
+function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
+function sv(){mem=st;try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
+{id:1,t:"회의 끝나기 5분 전에 ‘잠깐만요’ 하는 사람",c:"퇴근 10분 전에 시작된 회의가 한 시간을 넘겼어요. 다들 말은 안 했지만 눈빛은 이미 집에 가 있었어요. 저만 이런 건 아니겠죠?",cat:"직장·학교",ts:n-3*h,r:{a:14,b:5,c:3},cm:[{id:2,t:"그 눈빛, 저도 알아요. 오늘은 맛있는 거 드세요.",ts:n-2*h,rp:[]}],rp:[]},
+{id:3,t:"배달 앱 별점은 5점인데 음식은 식어 있었어요",c:"비 오는 날 기다린 한 시간. 도착한 국물은 미지근했고 사과는 한마디도 없었어요. 따지기도 애매해서 그냥 먹었는데 계속 마음이 불편해요.",cat:"서비스·소비",ts:n-9*h,r:{a:9,b:11,c:2},cm:[],rp:[]},
+{id:4,t:"지하철에서 가방으로 밀치고 간 분께",c:"출근길 환승 구간에서 가방에 세게 맞았는데 돌아보지도 않고 가셨어요. 하루 종일 어깨가 얼얼했지만, 그 사람도 급했나 보다 하고 넘기려고요. 그래도 속상했어요.",cat:"교통·공공장소",ts:n-26*h,r:{a:6,b:4,c:7},cm:[],rp:[]},
+{id:5,t:"명절 안부 질문이 부담스러워요",c:"좋은 마음으로 물어보시는 건 알지만, 같은 질문을 매번 받으면 마음이 조금씩 닳아요. 올해는 웃으며 화제를 돌리는 연습을 해보려고요.",cat:"가족·친구",ts:n-50*h,r:{a:21,b:8,c:12},cm:[{id:6,t:"화제 돌리기 연습, 응원합니다. 저는 간식 이야기로 돌려요.",ts:n-40*h,rp:[]}],rp:[]}]}}
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function ago(t){var m=Math.floor((Date.now()-t)/6e4);if(m<1)return"방금 전";if(m<60)return m+"분 전";var h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전"}
+function vis(p){return !p.h&&p.rp.length<3}
+function total(p){return p.r.a+p.r.b+p.r.c}
+function toast(m){var e=document.createElement("div");e.className="toast";e.textContent=m;document.body.appendChild(e);setTimeout(function(){e.remove()},2200)}
+function pii(s){
+ if(/0\d{1,2}[-.\s]?\d{3,4}[-.\s]?\d{4}/.test(s))return"전화번호처럼 보이는 내용이 있어요. 지워주세요.";
+ if(/[\w.+-]+@[\w-]+\.[\w.]+/.test(s))return"이메일 주소가 포함되어 있어요. 지워주세요.";
+ if(/\d{6}-?[1-4]\d{6}/.test(s))return"주민등록번호처럼 보이는 내용이 있어요. 지워주세요.";
+ if(/https?:\/\/|www\./i.test(s))return"링크나 계정 정보는 올릴 수 없어요.";
+ if(/죽여\s?(버|야|주)|신상\s?(을\s)?(털|공개)|찾아가서|가만\s?안\s?둬/.test(s))return"위협이나 보복을 떠올리게 하는 표현이 있어요. 내 마음이 어땠는지 중심으로 바꿔 써주세요.";
+ return""}
+function nav(){var h=location.hash.replace("#","")||"home";
+ document.getElementById("nav").innerHTML=[["home","게시판"],["rules","이용 규칙"],["admin","신고·관리"]].map(function(x){return'<a href="#'+(x[0]==="home"?"":x[0])+'" class="'+(h===x[0]?"on":"")+'">'+x[1]+'</a>'}).join("")}
+function render(){nav();var h=location.hash.replace("#","")||"home",a=document.getElementById("app");
+ a.innerHTML=h==="rules"?rules():h==="admin"?admin():home();window.scrollTo&&0}
+function home(){
+ var ps=st.posts.filter(vis).filter(function(p){return cat==="전체"||p.cat===cat});
+ ps.sort(function(x,y){return sort==="new"?y.ts-x.ts:total(y)-total(x)||y.ts-x.ts});
+ return'<section class="hero"><h1><span>불편한</span> 게시판</h1><p>오늘의 불편함을 털어놓아 보세요</p><p class="hint">이름도 계정도 필요 없어요. 털어놓고, 위로받고, 가볍게 돌아가요.</p><button class="btn big" data-a="write">글쓰기</button></section>'
+ +'<div class="bar"><div class="chips">'+["전체"].concat(CATS).map(function(c){return'<button class="chip '+(cat===c?"on":"")+'" data-a="cat" data-v="'+c+'">'+c+'</button>'}).join("")+'</div>'
+ +'<div class="chips"><button class="chip '+(sort==="new"?"on":"")+'" data-a="sort" data-v="new">최신순</button><button class="chip '+(sort==="like"?"on":"")+'" data-a="sort" data-v="like">공감순</button></div></div>'
+ +(ps.length?ps.map(note).join(""):'<div class="empty">아직 이 분류에는 글이 없어요.<br>첫 이야기를 들려주시겠어요?</div>')}
+function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h});
+ var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
+ +'<div class="rx">'+RX.map(function(r){return'<button class="'+(st.my[p.id+r[0]]?"me":"")+'" data-a="rx" data-id="'+p.id+'" data-v="'+r[0]+'" aria-pressed="'+!!st.my[p.id+r[0]]+'">'+r[1]+" "+p.r[r[0]]+'</button>'}).join("")+'</div>'
+ +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button></div>';
+ if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>익명 · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button></small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
+ +'<label for="cmt'+p.id+'">위로와 공감의 말을 남겨주세요</label><textarea id="cmt'+p.id+'" maxlength="300" placeholder="예) 정말 속상했겠어요. 오늘은 푹 쉬세요."></textarea><div class="err" id="ce'+p.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="cmt" data-id="'+p.id+'">댓글 남기기</button></div></div>'}
+ return s+'</article>'}
+function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기는 감정을 내려놓는 곳이에요. 누군가를 공격하는 곳이 아니라, 마음을 안전하게 꺼내 놓는 곳이에요.</p>'
+ +'<div class="box warn"><b>이런 글은 올릴 수 없어요</b><ul><li>실명, 전화번호, 주소, 계정·아이디, 회사·학교 이름 등 개인을 알아볼 수 있는 정보</li><li>특정인을 괴롭히거나 위협하는 글</li><li>성별, 지역, 나이, 장애, 출신 등에 대한 혐오 표현</li><li>보복이나 신상 공개를 부추기는 내용</li><li>광고, 링크, 반복 도배</li></ul></div>'
+ +'<div class="box"><b>이렇게 써주세요</b><ul><li>상대의 이름 대신 “상사”, “옆자리 손님”처럼 바꿔 써요.</li><li>누가 봐도 알 만한 시간, 장소, 사건 정보는 조금 바꾸거나 빼요.</li><li>상대를 평가하기보다 내가 겪은 일과 내 마음을 중심으로 써요.</li></ul></div>'
+ +'<div class="box"><b>댓글은 이렇게 남겨요</b><ul><li>조언을 강요하기보다 먼저 공감해 주세요.</li><li>“그 정도로 뭘”처럼 마음을 가볍게 여기는 말은 삼가요.</li></ul></div>'
+ +'<div class="box"><b>신고와 조치</b><p style="margin:6px 0 0">규칙에 어긋나는 글이나 댓글은 신고할 수 있어요. 신고가 3건 이상 쌓이면 운영자가 확인하는 동안 글이 임시로 가려지고, 검토 후 숨김, 삭제 또는 복구 여부를 결정해요.</p></div>'
+ +'<div class="box warn"><b>마음이 많이 힘들다면</b><p style="margin:6px 0 0">혼자 견디기 어려운 상황이라면 자살예방상담전화 109(24시간)나 정신건강상담전화 1577-0199에 연락해 보세요.</p></div>'
+ +'<button class="btn" data-a="write">규칙을 확인했어요, 글쓰기</button>'}
+function admin(){
+ var items=[];st.posts.forEach(function(p){if(p.rp.length||p.h)items.push({p:p});p.cm.forEach(function(c){if(c.rp.length||c.h)items.push({p:p,c:c})})});
+ var h='<h2 class="pg">신고·관리</h2><p class="hint">신고가 접수된 글과 댓글을 확인해요. 이 화면은 체험용이라 현재 브라우저에 저장된 내용만 보여요.</p>';
+ if(!items.length)return h+'<div class="empty">검토할 신고가 없어요. 오늘도 평화로워요.</div>';
+ return h+items.map(function(i){var p=i.p,c=i.c,o=c||p,rp=o.rp;
+  var rs=rp.map(function(r){return esc(r)}).join(" / ")||"신고 내역 없음";
+  var state=o.h?"숨김 처리됨":(rp.length>=3&&!c?"임시로 가려짐":"공개 중");
+  return'<div class="box adm"><div class="meta"><span>'+(c?"댓글":"게시글")+' · '+esc(p.cat)+'</span><span>신고 '+rp.length+'건 · '+state+'</span></div>'
+  +(c?'<p class="hint" style="margin:6px 0 0">원글: '+esc(p.t)+'</p>':'')+'<p class="txt" style="margin:6px 0"><b>'+esc(c?c.t:p.t)+'</b>'+(c?'':'\n'+esc(p.c.slice(0,140)))+'</p>'
+  +'<p class="hint" style="margin:0">신고 사유: '+rs+'</p><div class="row" style="justify-content:flex-start;flex-wrap:wrap">'
+  +'<button class="btn sm ghost" data-a="ok" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>문제없음, 신고 해제</button>'
+  +'<button class="btn sm ghost" data-a="hide" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>'+(o.h?"숨김 해제":"숨기기")+'</button>'
+  +'<button class="btn sm" data-a="del" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>삭제</button></div></div>'}).join("")}
+function modal(h){var o=document.getElementById("ov");document.getElementById("md").innerHTML=h;o.classList.add("on")}
+function closeM(){document.getElementById("ov").classList.remove("on")}
+function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">익명으로 올라가요. 마음 편히 써주세요.</p>'
+ +'<div class="box warn" style="font-size:14px;margin:10px 0"><b>올리기 전에 확인해 주세요</b><ul style="margin:6px 0 0"><li>실명, 전화번호, 주소, 계정 정보는 쓰지 마세요.</li><li>상대의 이름이나 알아볼 만한 세부 정보는 “상사”, “손님”처럼 바꿔 쓰거나 빼주세요.</li><li>특정인을 괴롭히거나 위협하는 글, 혐오 표현, 보복을 부추기는 글은 올릴 수 없어요.</li></ul></div>'
+ +'<label for="wc">상황 분류</label><select id="wc">'+CATS.map(function(c){return'<option>'+c+'</option>'}).join("")+'</select>'
+ +'<label for="wt">제목</label><input id="wt" maxlength="40" placeholder="한 줄로 요약해 주세요">'
+ +'<label for="wb">내용</label><textarea id="wb" maxlength="1000" rows="6" placeholder="어떤 일이 있었고, 마음이 어땠는지 편하게 적어주세요."></textarea>'
+ +'<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="wa" style="width:auto;margin-top:5px"><span>이용 규칙을 읽었고 동의해요. <a href="#rules" data-a="x" style="color:inherit">규칙 보기</a></span></label>'
+ +'<div class="err" id="we"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="post">올리기</button></div>')}
+function rp(id,cid){modal('<h2>신고하기</h2><p class="hint">운영자가 확인할 수 있도록 이유를 알려주세요.</p><label for="rr">신고 사유</label><select id="rr">'+REASONS.map(function(r){return'<option>'+r+'</option>'}).join("")+'</select><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="sendrep" data-id="'+id+'"'+(cid?' data-c="'+cid+'"':'')+'>신고 접수</button></div>')}
+function fp(id){return st.posts.filter(function(p){return p.id==id})[0]}
+document.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
+ var a=b.dataset.a,id=b.dataset.id,cid=b.dataset.c,p=id?fp(id):null;
+ if(a==="x"){closeM();return}
+ if(a==="write"){wr();return}
+ if(a==="cat"){cat=b.dataset.v}
+ else if(a==="sort"){sort=b.dataset.v}
+ else if(a==="open"){openId=openId==p.id?null:p.id}
+ else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v;if(st.my[k]){delete st.my[k];p.r[v]--}else{st.my[k]=1;p.r[v]++}sv()}
+ else if(a==="rep"){rp(id,cid);return}
+ else if(a==="sendrep"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.rp.push(document.getElementById("rr").value);sv();closeM();toast("신고가 접수되었어요. 운영자가 확인할게요.")}
+ else if(a==="cmt"){var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
+  if(t.length<2){er.textContent="댓글을 입력해 주세요.";return}
+  var m=pii(t);if(m){er.textContent=m;return}
+  p.cm.push({id:st.n++,t:t,ts:Date.now(),rp:[]});sv();toast("따뜻한 댓글이 등록되었어요.")}
+ else if(a==="post"){var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
+  if(!t||c.length<10){er.textContent="제목과 내용을 입력해 주세요. 내용은 10자 이상 적어주세요.";return}
+  var m=pii(t+" "+c);if(m){er.textContent=m;return}
+  if(!document.getElementById("wa").checked){er.textContent="글을 올리려면 이용 규칙에 동의해 주세요.";return}
+  st.posts.unshift({id:st.n++,t:t,c:c,cat:document.getElementById("wc").value,ts:Date.now(),r:{a:0,b:0,c:0},cm:[],rp:[]});sv();closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}
+ else if(a==="ok"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.rp=[];o.h=false;sv()}
+ else if(a==="hide"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.h=!o.h;sv()}
+ else if(a==="del"){if(!confirm("정말 삭제할까요? 되돌릴 수 없어요."))return;if(cid)p.cm=p.cm.filter(function(c){return c.id!=cid});else st.posts=st.posts.filter(function(x){return x.id!=p.id});sv()}
+ render()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
+window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
+st=ld()||seed();sv();render();
+</script>
+</body>
+</html>
