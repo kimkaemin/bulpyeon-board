@@ -19,6 +19,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:"Gowun Dodum","A
 nav{display:flex;gap:6px;justify-content:flex-end;padding:14px 0 0}
 nav a{padding:6px 12px;border-radius:99px;color:var(--sub);text-decoration:none;font-size:14px}
 nav a.on{background:var(--ink);color:var(--bg)}
+.auth-nav{padding:6px 12px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
 a:focus-visible,button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #4a8cf0;outline-offset:2px}
 .hero{padding:28px 0 18px}
 h1{margin:0;font-size:clamp(40px,11vw,60px);line-height:1.1;font-weight:400;letter-spacing:-.03em}
@@ -26,6 +27,8 @@ h1 span{background:linear-gradient(transparent 58%,var(--hl) 58%);padding:0 4px}
 .hero p{margin:10px 0 0;color:var(--sub);font-size:18px}
 .btn{border:0;background:var(--btn);color:var(--btnt);font:inherit;padding:11px 20px;border-radius:12px;cursor:pointer}
 .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.google{width:100%;background:#fff;color:#30343b;border:1px solid #d9dde3;font-family:Arial,"Apple SD Gothic Neo",sans-serif;font-weight:600;display:flex;align-items:center;justify-content:center;gap:10px}
+.google-mark{font-size:18px;font-weight:700;color:#4285f4}
 .btn.sm{padding:5px 12px;font-size:14px}
 .btn.big{font-size:18px;padding:13px 26px;margin-top:18px}
 .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:18px 0 12px}
@@ -73,13 +76,18 @@ ol,ul{padding-left:20px}li{margin:6px 0}
 <main id="app"></main>
 </div>
 <div id="ov"><div class="modal" id="md" role="dialog" aria-modal="true"></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 var CATS=["직장·학교","가족·친구","서비스·소비","교통·공공장소","기타"];
 var RX=[["a","😮‍💨 나도 그랬어요"],["b","🫂 속상했겠어요"],["c","🌱 읽고 응원해요"]];
 var REASONS=["개인정보(실명·연락처·주소 등)가 있어요","특정인을 괴롭히거나 위협해요","혐오 표현이 있어요","보복을 부추겨요","기타"];
-var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null;
+var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
+var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
+var SITE_URL="https://kimkaemin.github.io/bulpyeon-board/";
+var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
 function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
-function sv(){mem=st;try{localStorage.setItem(KEY,JSON.stringify(st))}catch(e){}}
+function sv(){mem=st}
 function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
 {id:1,t:"회의 끝나기 5분 전에 ‘잠깐만요’ 하는 사람",c:"퇴근 10분 전에 시작된 회의가 한 시간을 넘겼어요. 다들 말은 안 했지만 눈빛은 이미 집에 가 있었어요. 저만 이런 건 아니겠죠?",cat:"직장·학교",ts:n-3*h,r:{a:14,b:5,c:3},cm:[{id:2,t:"그 눈빛, 저도 알아요. 오늘은 맛있는 거 드세요.",ts:n-2*h,rp:[]}],rp:[]},
 {id:3,t:"배달 앱 별점은 5점인데 음식은 식어 있었어요",c:"비 오는 날 기다린 한 시간. 도착한 국물은 미지근했고 사과는 한마디도 없었어요. 따지기도 애매해서 그냥 먹었는데 계속 마음이 불편해요.",cat:"서비스·소비",ts:n-9*h,r:{a:9,b:11,c:2},cm:[],rp:[]},
@@ -98,7 +106,10 @@ function pii(s){
  if(/죽여\s?(버|야|주)|신상\s?(을\s)?(털|공개)|찾아가서|가만\s?안\s?둬/.test(s))return"위협이나 보복을 떠올리게 하는 표현이 있어요. 내 마음이 어땠는지 중심으로 바꿔 써주세요.";
  return""}
 function nav(){var h=location.hash.replace("#","")||"home";
- document.getElementById("nav").innerHTML=[["home","게시판"],["rules","이용 규칙"],["admin","신고·관리"]].map(function(x){return'<a href="#'+(x[0]==="home"?"":x[0])+'" class="'+(h===x[0]?"on":"")+'">'+x[1]+'</a>'}).join("")}
+ var links=[["home","게시판"],["rules","이용 규칙"],["admin","신고·관리"]].map(function(x){return'<a href="#'+(x[0]==="home"?"":x[0])+'" class="'+(h===x[0]?"on":"")+'">'+x[1]+'</a>'}).join("");
+ var pending="";try{pending=localStorage.getItem("painboard_pending_email")}catch(e){}
+ var auth=currentUserId&&!currentIsAnonymous?'<button class="auth-nav" data-a="auth">'+(pending?"비밀번호 설정":esc(currentUserEmail||"내 계정"))+'</button><button class="auth-nav" data-a="authout">로그아웃</button>':'<button class="auth-nav" data-a="auth">로그인 · 회원가입</button>';
+ document.getElementById("nav").innerHTML=links+auth}
 function render(){nav();var h=location.hash.replace("#","")||"home",a=document.getElementById("app");
  a.innerHTML=h==="rules"?rules():h==="admin"?admin():home();window.scrollTo&&0}
 function home(){
@@ -111,8 +122,8 @@ function home(){
 function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h});
  var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
  +'<div class="rx">'+RX.map(function(r){return'<button class="'+(st.my[p.id+r[0]]?"me":"")+'" data-a="rx" data-id="'+p.id+'" data-v="'+r[0]+'" aria-pressed="'+!!st.my[p.id+r[0]]+'">'+r[1]+" "+p.r[r[0]]+'</button>'}).join("")+'</div>'
- +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button></div>';
- if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>익명 · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button></small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
+ +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button>'+(currentUserId&&p.author_id===currentUserId?'<button class="lnk" data-a="deletepost" data-id="'+p.id+'">삭제</button>':'')+'</div>';
+ if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>익명 · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button>'+(currentUserId&&c.author_id===currentUserId?' · <button class="lnk" data-a="deletecomment" data-id="'+p.id+'" data-c="'+c.id+'">삭제</button>':'')+'</small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
  +'<label for="cmt'+p.id+'">위로와 공감의 말을 남겨주세요</label><textarea id="cmt'+p.id+'" maxlength="300" placeholder="예) 정말 속상했겠어요. 오늘은 푹 쉬세요."></textarea><div class="err" id="ce'+p.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="cmt" data-id="'+p.id+'">댓글 남기기</button></div></div>'}
  return s+'</article>'}
 function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기는 감정을 내려놓는 곳이에요. 누군가를 공격하는 곳이 아니라, 마음을 안전하게 꺼내 놓는 곳이에요.</p>'
@@ -123,20 +134,27 @@ function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기�
  +'<div class="box warn"><b>마음이 많이 힘들다면</b><p style="margin:6px 0 0">혼자 견디기 어려운 상황이라면 자살예방상담전화 109(24시간)나 정신건강상담전화 1577-0199에 연락해 보세요.</p></div>'
  +'<button class="btn" data-a="write">규칙을 확인했어요, 글쓰기</button>'}
 function admin(){
- var items=[];st.posts.forEach(function(p){if(p.rp.length||p.h)items.push({p:p});p.cm.forEach(function(c){if(c.rp.length||c.h)items.push({p:p,c:c})})});
- var h='<h2 class="pg">신고·관리</h2><p class="hint">신고가 접수된 글과 댓글을 확인해요. 이 화면은 체험용이라 현재 브라우저에 저장된 내용만 보여요.</p>';
- if(!items.length)return h+'<div class="empty">검토할 신고가 없어요. 오늘도 평화로워요.</div>';
- return h+items.map(function(i){var p=i.p,c=i.c,o=c||p,rp=o.rp;
-  var rs=rp.map(function(r){return esc(r)}).join(" / ")||"신고 내역 없음";
-  var state=o.h?"숨김 처리됨":(rp.length>=3&&!c?"임시로 가려짐":"공개 중");
-  return'<div class="box adm"><div class="meta"><span>'+(c?"댓글":"게시글")+' · '+esc(p.cat)+'</span><span>신고 '+rp.length+'건 · '+state+'</span></div>'
-  +(c?'<p class="hint" style="margin:6px 0 0">원글: '+esc(p.t)+'</p>':'')+'<p class="txt" style="margin:6px 0"><b>'+esc(c?c.t:p.t)+'</b>'+(c?'':'\n'+esc(p.c.slice(0,140)))+'</p>'
-  +'<p class="hint" style="margin:0">신고 사유: '+rs+'</p><div class="row" style="justify-content:flex-start;flex-wrap:wrap">'
-  +'<button class="btn sm ghost" data-a="ok" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>문제없음, 신고 해제</button>'
-  +'<button class="btn sm ghost" data-a="hide" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>'+(o.h?"숨김 해제":"숨기기")+'</button>'
-  +'<button class="btn sm" data-a="del" data-id="'+p.id+'"'+(c?' data-c="'+c.id+'"':'')+'>삭제</button></div></div>'}).join("")}
+ var h='<h2 class="pg">신고·관리</h2><p class="hint">신고 내역은 Supabase 대시보드의 board_reports에서 확인할 수 있어요. 운영자 권한을 웹페이지에 공개하지 않도록 조치 버튼은 운영자 전용 설정 후 연결합니다.</p>';
+ return h+'<div class="box"><b>공유 데이터베이스 연결됨</b><p style="margin:6px 0 0">현재 게시판에 표시된 글 '+st.posts.length+'개</p></div>'
+ +'<div class="box warn"><b>운영자 전용 관리</b><p style="margin:6px 0 0">게시글 숨김·삭제는 공개 페이지에서 누구나 실행할 수 없도록 잠겨 있어요. 신고 검토는 Supabase 대시보드에서 해주세요.</p></div>'
+ +'<a class="btn ghost" style="display:inline-block;text-decoration:none" href="https://supabase.com/dashboard/project/kgbsbjxowacybxzkggcj/editor">Supabase에서 게시글 관리</a>'}
 function modal(h){var o=document.getElementById("ov");document.getElementById("md").innerHTML=h;o.classList.add("on")}
 function closeM(){document.getElementById("ov").classList.remove("on")}
+function authModal(mode,email){
+ if(mode==="verify"){modal('<h2>메일을 확인해 주세요</h2><p class="hint">'+esc(email||"")+' 주소로 인증 링크를 보냈어요. 메일을 확인하고 이 브라우저에서 링크를 열면 기존 글과 댓글이 계정에 연결됩니다. 메일이 안 보이면 스팸함도 확인해 주세요.</p><div class="row"><button class="btn" data-a="x">확인</button></div>');return}
+ var title=mode==="password"?"비밀번호 설정":mode==="signup"?"회원가입":"로그인";
+ if(mode==="account"){modal('<h2>로그인된 계정</h2><p class="hint">'+esc(currentUserEmail)+'</p><div class="row"><button class="btn ghost" data-a="x">닫기</button><button class="btn ghost" data-a="authmode" data-v="password">비밀번호 설정·변경</button><button class="btn" data-a="authout">로그아웃</button></div>');return}
+ var switcher=mode==="password"?'':'<div class="chips" style="margin:12px 0"><button class="chip '+(mode==="login"?"on":"")+'" data-a="authmode" data-v="login">로그인</button><button class="chip '+(mode==="signup"?"on":"")+'" data-a="authmode" data-v="signup">회원가입</button></div>';
+ var body=mode==="signup"?'<p class="hint">이메일 인증 메일 없이 가입해요. 이메일 주소가 실제 본인 것인지 확인하지 않으니, 비밀번호를 잊었을 때 복구하기 어려울 수 있어요. 가입하면 이 브라우저의 익명 임시 계정과 별도의 계정이 만들어져, 이전에 익명으로 쓴 글·댓글의 작성자 권한은 이어지지 않을 수 있어요.</p><label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com"><label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="new-password" minlength="8" placeholder="8자 이상"><label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">'
+  :'<p class="hint">'+(mode==="password"?"사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
+   +'<label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" minlength="8" placeholder="8자 이상">'+(mode==="password"?'<label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">':'');
+ var action=mode==="signup"?"가입하기":mode==="password"?"비밀번호 저장":"로그인";
+ var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" type="button"><span class="google-mark" aria-hidden="true">G</span>Google로 계속하기</button><p class="hint">Google 가입 시 기존 익명 임시 계정의 글·댓글 작성자 권한은 이어지지 않을 수 있어요.</p></div>';
+ modal('<h2>'+title+'</h2>'+switcher+body+google+'<div class="err" id="aeerr" aria-live="polite"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="authsubmit" data-v="'+mode+'">'+action+'</button></div>')
+}
+function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
+function setUserSession(session){var u=session&&session.user;currentUserId=u?u.id:null;currentUserEmail=u&&u.email||"";currentIsAnonymous=!u||!!u.is_anonymous}
+function pendingEmail(){try{return localStorage.getItem("painboard_pending_email")}catch(e){return""}}
 function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">익명으로 올라가요. 마음 편히 써주세요.</p>'
  +'<div class="box warn" style="font-size:14px;margin:10px 0"><b>올리기 전에 확인해 주세요</b><ul style="margin:6px 0 0"><li>실명, 전화번호, 주소, 계정 정보는 쓰지 마세요.</li><li>상대의 이름이나 알아볼 만한 세부 정보는 “상사”, “손님”처럼 바꿔 쓰거나 빼주세요.</li><li>특정인을 괴롭히거나 위협하는 글, 혐오 표현, 보복을 부추기는 글은 올릴 수 없어요.</li></ul></div>'
  +'<label for="wc">상황 분류</label><select id="wc">'+CATS.map(function(c){return'<option>'+c+'</option>'}).join("")+'</select>'
@@ -146,32 +164,74 @@ function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">�
  +'<div class="err" id="we"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="post">올리기</button></div>')}
 function rp(id,cid){modal('<h2>신고하기</h2><p class="hint">운영자가 확인할 수 있도록 이유를 알려주세요.</p><label for="rr">신고 사유</label><select id="rr">'+REASONS.map(function(r){return'<option>'+r+'</option>'}).join("")+'</select><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="sendrep" data-id="'+id+'"'+(cid?' data-c="'+cid+'"':'')+'>신고 접수</button></div>')}
 function fp(id){return st.posts.filter(function(p){return p.id==id})[0]}
-document.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
+function voter(){return currentUserId}
+function reportMap(rows,key){var out={};rows.forEach(function(r){var k=key(r);(out[k]||(out[k]=[])).push(r.reason)});return out}
+async function refresh(){
+ var results=await Promise.all([
+  sb.from("board_posts").select("*").order("created_at",{ascending:false}),
+  sb.from("board_comments").select("*").order("created_at"),
+  sb.from("board_reactions").select("*")
+ ]);
+ var err=results.filter(function(x){return x.error})[0];if(err)throw err.error;
+ var comments=results[1].data||[],reactions=results[2].data||[];
+ var my={},posts=(results[0].data||[]).map(function(row){var p={id:row.id,author_id:row.author_id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
+  reactions.filter(function(r){return r.post_id===row.id}).forEach(function(r){p.r[r.reaction]++;if(r.voter_key===voter())my[p.id+r.reaction]=1});
+  p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,author_id:c.author_id,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
+ st={n:0,my:my,posts:posts};render();
+}
+function dbError(err){console.error("Supabase request failed",err);toast("연결 오류: Supabase 설정과 테이블을 확인해 주세요.")}
+async function send(action){try{await action();await refresh();return true}catch(err){dbError(err);return false}}
+document.addEventListener("click",async function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
  var a=b.dataset.a,id=b.dataset.id,cid=b.dataset.c,p=id?fp(id):null;
  if(a==="x"){closeM();return}
+ if(a==="auth"){var pending=pendingEmail();authModal(pending&&currentUserId&&!currentIsAnonymous?"password":currentIsAnonymous?"login":"account",pending||currentUserEmail);return}
+ if(a==="authmode"){authModal(b.dataset.v);return}
+ if(a==="googleauth"){if(authBusy)return;authBusy=true;b.disabled=true;try{var oauth=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}});if(oauth.error)throw oauth.error}catch(err){authBusy=false;b.disabled=false;var googleErr=document.getElementById("aeerr");if(googleErr)googleErr.textContent=authMessage(err)}return}
+ if(a==="authout"){if(authBusy)return;if(!confirm("로그아웃할까요?"))return;authBusy=true;try{await sb.auth.signOut();var anon=await sb.auth.signInAnonymously();if(anon.error)throw anon.error;setUserSession(anon.data.session);await refresh();closeM();toast("로그아웃했어요.")}catch(err){toast(authMessage(err))}finally{authBusy=false}return}
+ if(a==="authsubmit"){
+  if(authBusy)return;var mode=b.dataset.v,email=(mode==="password"?currentUserEmail:(document.getElementById("ae")||{}).value||"").trim().toLowerCase(),pass=(document.getElementById("ap")||{}).value||"",errBox=document.getElementById("aeerr");
+  if(mode!=="password"&&(!email||!/^\S+@\S+\.\S+$/.test(email))){errBox.textContent="올바른 이메일 주소를 입력해 주세요.";return}
+  if(mode==="signup"&&pass.length<8){errBox.textContent="비밀번호는 8자 이상으로 입력해 주세요.";return}
+  if(mode==="signup"&&pass!==((document.getElementById("ap2")||{}).value||"")){errBox.textContent="비밀번호가 서로 달라요.";return}
+  if(pass.length<8){errBox.textContent="비밀번호는 8자 이상으로 입력해 주세요.";return}
+  if(mode==="password"&&pass!==((document.getElementById("ap2")||{}).value||"")){errBox.textContent="비밀번호가 서로 달라요.";return}
+  authBusy=true;b.disabled=true;try{
+   if(mode==="login"){var signed=await sb.auth.signInWithPassword({email:email,password:pass});if(signed.error)throw signed.error;setUserSession(signed.data.session);await refresh();closeM();toast("로그인했어요.")}
+   else if(mode==="signup"){var registered=await sb.auth.signUp({email:email,password:pass});if(registered.error)throw registered.error;if(!registered.data.session)throw new Error("이메일 인증이 필요한 설정이에요. Supabase에서 Confirm email을 꺼 주세요.");try{localStorage.removeItem("painboard_pending_email")}catch(e){};setUserSession(registered.data.session);await refresh();closeM();toast("가입이 완료됐어요.")}
+   else {var changed=await sb.auth.updateUser({password:pass});if(changed.error)throw changed.error;try{localStorage.removeItem("painboard_pending_email")}catch(e){};var sessionResult=await sb.auth.getSession();setUserSession(sessionResult.data.session);await refresh();closeM();toast("비밀번호가 저장됐어요.")}
+  }catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return
+ }
  if(a==="write"){wr();return}
  if(a==="cat"){cat=b.dataset.v}
  else if(a==="sort"){sort=b.dataset.v}
  else if(a==="open"){openId=openId==p.id?null:p.id}
- else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v;if(st.my[k]){delete st.my[k];p.r[v]--}else{st.my[k]=1;p.r[v]++}sv()}
+ else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v,removing=!!st.my[k];if(!currentUserId){toast("잠시 후 다시 눌러주세요.")}else if(await send(async function(){var q=removing?await sb.from("board_reactions").delete().eq("post_id",p.id).eq("reaction",v).eq("voter_key",voter()):await sb.from("board_reactions").insert({post_id:p.id,reaction:v,voter_key:voter()});if(q.error)throw q.error}))toast(removing?"공감을 취소했어요.":"공감이 전달됐어요.")}
+ else if(a==="deletepost"){if(!p||p.author_id!==currentUserId){toast("작성자만 글을 삭제할 수 있어요.")}else if(confirm("정말 이 글을 삭제할까요? 댓글과 공감도 함께 삭제돼요.")){if(await send(async function(){var x=await sb.from("board_posts").delete().eq("id",p.id);if(x.error)throw x.error})){openId=null;toast("글을 삭제했어요.")}}}
+ else if(a==="deletecomment"){var cm=p&&p.cm.filter(function(x){return x.id===cid})[0];if(!cm||cm.author_id!==currentUserId){toast("작성자만 댓글을 삭제할 수 있어요.")}else if(confirm("이 댓글을 삭제할까요?")){if(await send(async function(){var x=await sb.from("board_comments").delete().eq("id",cid).eq("post_id",p.id);if(x.error)throw x.error}))toast("댓글을 삭제했어요.")}}
  else if(a==="rep"){rp(id,cid);return}
- else if(a==="sendrep"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.rp.push(document.getElementById("rr").value);sv();closeM();toast("신고가 접수되었어요. 운영자가 확인할게요.")}
- else if(a==="cmt"){var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
+ else if(a==="sendrep"){var reason=document.getElementById("rr").value;var q=await send(async function(){var x=await sb.from("board_reports").insert({post_id:id,comment_id:cid||null,reason:reason});if(x.error)throw x.error});if(q){closeM();toast("신고가 접수됐어요. 운영자가 검토할게요.")}}
+ else if(a==="cmt"){if(commentLocks[id]||Date.now()<(commentCooldowns[id]||0))return;var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
   if(t.length<2){er.textContent="댓글을 입력해 주세요.";return}
   var m=pii(t);if(m){er.textContent=m;return}
-  p.cm.push({id:st.n++,t:t,ts:Date.now(),rp:[]});sv();toast("따뜻한 댓글이 등록되었어요.")}
- else if(a==="post"){var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
+  commentLocks[id]=true;b.disabled=true;var didComment=await send(async function(){var x=await sb.from("board_comments").insert({post_id:id,body:t});if(x.error)throw x.error});commentLocks[id]=false;
+  if(didComment){commentCooldowns[id]=Date.now()+1500;toast("따뜻한 댓글이 등록되었어요.")}else b.disabled=false}
+ else if(a==="post"){if(posting||Date.now()<postCooldownUntil)return;var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
   if(!t||c.length<10){er.textContent="제목과 내용을 입력해 주세요. 내용은 10자 이상 적어주세요.";return}
   var m=pii(t+" "+c);if(m){er.textContent=m;return}
   if(!document.getElementById("wa").checked){er.textContent="글을 올리려면 이용 규칙에 동의해 주세요.";return}
-  st.posts.unshift({id:st.n++,t:t,c:c,cat:document.getElementById("wc").value,ts:Date.now(),r:{a:0,b:0,c:0},cm:[],rp:[]});sv();closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}
- else if(a==="ok"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.rp=[];o.h=false;sv()}
- else if(a==="hide"){var o=cid?p.cm.filter(function(c){return c.id==cid})[0]:p;o.h=!o.h;sv()}
- else if(a==="del"){if(!confirm("정말 삭제할까요? 되돌릴 수 없어요."))return;if(cid)p.cm=p.cm.filter(function(c){return c.id!=cid});else st.posts=st.posts.filter(function(x){return x.id!=p.id});sv()}
+  posting=true;b.disabled=true;var didPost=await send(async function(){var x=await sb.from("board_posts").insert({title:t,body:c,category:document.getElementById("wc").value});if(x.error)throw x.error});posting=false;
+  if(didPost){postCooldownUntil=Date.now()+2500;closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}else b.disabled=false}
+ else if(a==="ok"||a==="hide"||a==="del"){toast("운영자 권한이 필요한 기능이에요. Supabase 대시보드에서 처리해 주세요.")}
  render()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
 window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
-st=ld()||seed();sv();render();
+st={n:0,my:{},posts:[]};render();
+async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();var pending=pendingEmail();if(pending&&session.user&&!session.user.is_anonymous&&session.user.email&&session.user.email.toLowerCase()===pending.toLowerCase())setTimeout(function(){authModal("password",pending)},250)}
+startBoard().catch(function(e){dbError(e)});
+sb.channel("board-live-updates").on("postgres_changes",{event:"*",schema:"public",table:"board_posts"},function(){refresh().catch(dbError)})
+ .on("postgres_changes",{event:"*",schema:"public",table:"board_comments"},function(){refresh().catch(dbError)})
+ .on("postgres_changes",{event:"*",schema:"public",table:"board_reactions"},function(){refresh().catch(dbError)})
+ .subscribe();
 </script>
 </body>
 </html>
