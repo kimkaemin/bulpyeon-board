@@ -157,3 +157,28 @@ create trigger board_posts_rate_limit before insert on public.board_posts
 drop trigger if exists board_comments_rate_limit on public.board_comments;
 create trigger board_comments_rate_limit before insert on public.board_comments
   for each row execute function public.board_rate_limit();
+
+-- ===== Nicknames: unique (case-insensitive), signed-in accounts only, shown only when the author opts in =====
+create table if not exists public.board_profiles (
+  user_id uuid primary key default auth.uid(),
+  nickname text not null
+    check (char_length(nickname) between 2 and 12 and nickname ~ '^[0-9A-Za-z가-힣_]+$')
+    check (lower(nickname) not in ('admin','administrator','운영자','관리자','운영진','익명')),
+  created_at timestamptz not null default now()
+);
+create unique index if not exists board_profiles_nickname_unique on public.board_profiles (lower(nickname));
+
+alter table public.board_profiles enable row level security;
+drop policy if exists "Anyone can read nicknames" on public.board_profiles;
+create policy "Anyone can read nicknames" on public.board_profiles for select to anon, authenticated using (true);
+drop policy if exists "Signed-in accounts can create their nickname" on public.board_profiles;
+create policy "Signed-in accounts can create their nickname" on public.board_profiles for insert to authenticated
+  with check (user_id = auth.uid() and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false);
+drop policy if exists "Accounts can change their own nickname" on public.board_profiles;
+create policy "Accounts can change their own nickname" on public.board_profiles for update to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+grant select on public.board_profiles to anon, authenticated;
+grant insert, update on public.board_profiles to authenticated;
+
+alter table public.board_posts add column if not exists show_nickname boolean not null default false;
+alter table public.board_comments add column if not exists show_nickname boolean not null default false;

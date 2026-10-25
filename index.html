@@ -74,6 +74,7 @@ h2.pg{font-weight:400;font-size:30px;margin:26px 0 6px}
 ol,ul{padding-left:20px}li{margin:6px 0}
 .adm{border-left:6px solid var(--err)}
 #foot{padding:32px 0 8px;text-align:center;font-size:14px}#foot a{color:var(--sub)}
+.nk{display:flex;gap:8px;align-items:center;font-size:14px;margin:8px 0}.nk input{width:auto;margin:0}
 @media (prefers-reduced-motion:no-preference){.note{transition:transform .15s}.note:hover{transform:rotate(-.4deg)}}
 </style>
 </head>
@@ -93,7 +94,8 @@ var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
 var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
 var SITE_URL="https://kimkaemin.github.io/bulpyeon-board/";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-var st=null,sort="new",cat="전체",openId=null,postLimit=20,hasMore=false,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
+var st=null,sort="new",cat="전체",openId=null,postLimit=20,hasMore=false,myNick="",nickMap={},nickRequired=false,nickTableOk=false,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
+function who(uid,sn){return sn&&nickMap[uid]?esc(nickMap[uid]):"익명"}
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
 function ago(t){var m=Math.floor((Date.now()-t)/6e4);if(m<1)return"방금 전";if(m<60)return m+"분 전";var h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전"}
 function vis(p){return !p.h&&p.rp.length<3}
@@ -109,7 +111,7 @@ function pii(s){
 function nav(){var h=location.hash.replace("#","")||"home";
  var links=[["home","게시판"],["rules","이용 규칙"],["admin","신고·관리"]].map(function(x){return'<a href="#'+(x[0]==="home"?"":x[0])+'" class="'+(h===x[0]?"on":"")+'">'+x[1]+'</a>'}).join("");
  var pending="";try{pending=localStorage.getItem("painboard_pending_email")}catch(e){}
- var auth=currentUserId&&!currentIsAnonymous?'<button class="auth-nav" data-a="auth">'+(pending?"비밀번호 설정":esc(currentUserEmail||"내 계정"))+'</button><button class="auth-nav" data-a="authout">로그아웃</button>':'<button class="auth-nav" data-a="auth">로그인 · 회원가입</button>';
+ var auth=currentUserId&&!currentIsAnonymous?'<button class="auth-nav" data-a="auth">'+(pending?"비밀번호 설정":esc(myNick||currentUserEmail||"내 계정"))+'</button><button class="auth-nav" data-a="authout">로그아웃</button>':'<button class="auth-nav" data-a="auth">로그인 · 회원가입</button>';
  document.getElementById("nav").innerHTML=links+auth}
 function render(){nav();var h=location.hash.replace("#","")||"home",a=document.getElementById("app");
  var drafts={},active=document.activeElement&&document.activeElement.id,pos=null;
@@ -127,11 +129,11 @@ function home(){
  +(ps.length?ps.map(note).join(""):'<div class="empty">아직 이 분류에는 글이 없어요.<br>첫 이야기를 들려주시겠어요?</div>')
  +(hasMore?'<div class="row" style="justify-content:center;margin-top:16px"><button class="btn ghost" data-a="more">글 더 보기</button></div>':'')}
 function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h});
- var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
+ var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+who(p.author_id,p.sn)+' · '+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
  +'<div class="rx">'+RX.map(function(r){return'<button class="'+(st.my[p.id+r[0]]?"me":"")+'" data-a="rx" data-id="'+p.id+'" data-v="'+r[0]+'" aria-pressed="'+!!st.my[p.id+r[0]]+'">'+r[1]+" "+p.r[r[0]]+'</button>'}).join("")+'</div>'
  +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button>'+(currentUserId&&p.author_id===currentUserId?'<button class="lnk" data-a="deletepost" data-id="'+p.id+'">삭제</button>':'')+'</div>';
- if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>익명 · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button>'+(currentUserId&&c.author_id===currentUserId?' · <button class="lnk" data-a="deletecomment" data-id="'+p.id+'" data-c="'+c.id+'">삭제</button>':'')+'</small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
- +'<label for="cmt'+p.id+'">위로와 공감의 말을 남겨주세요</label><textarea id="cmt'+p.id+'" maxlength="300" placeholder="예) 정말 속상했겠어요. 오늘은 푹 쉬세요."></textarea><div class="err" id="ce'+p.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="cmt" data-id="'+p.id+'">댓글 남기기</button></div></div>'}
+ if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>'+who(c.author_id,c.sn)+' · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button>'+(currentUserId&&c.author_id===currentUserId?' · <button class="lnk" data-a="deletecomment" data-id="'+p.id+'" data-c="'+c.id+'">삭제</button>':'')+'</small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
+ +'<label for="cmt'+p.id+'">위로와 공감의 말을 남겨주세요</label><textarea id="cmt'+p.id+'" maxlength="300" placeholder="예) 정말 속상했겠어요. 오늘은 푹 쉬세요."></textarea>'+(myNick?'<label class="nk"><input type="checkbox" id="cmn'+p.id+'"> 닉네임('+esc(myNick)+')으로 남기기</label>':'')+'<div class="err" id="ce'+p.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="cmt" data-id="'+p.id+'">댓글 남기기</button></div></div>'}
  return s+'</article>'}
 function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기는 감정을 내려놓는 곳이에요. 누군가를 공격하는 곳이 아니라, 마음을 안전하게 꺼내 놓는 곳이에요.</p>'
  +'<div class="box warn"><b>이런 글은 올릴 수 없어요</b><ul><li>실명, 전화번호, 주소, 계정·아이디, 회사·학교 이름 등 개인을 알아볼 수 있는 정보</li><li>특정인을 괴롭히거나 위협하는 글</li><li>성별, 지역, 나이, 장애, 출신 등에 대한 혐오 표현</li><li>보복이나 신상 공개를 부추기는 내용</li><li>광고, 링크, 반복 도배</li></ul></div>'
@@ -141,7 +143,7 @@ function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기�
  +'<div class="box warn"><b>마음이 많이 힘들다면</b><p style="margin:6px 0 0">혼자 견디기 어려운 상황이라면 자살예방상담전화 109(24시간)나 정신건강상담전화 1577-0199에 연락해 보세요.</p></div>'
  +'<button class="btn" data-a="write">규칙을 확인했어요, 글쓰기</button>'}
 function privacy(){return'<h2 class="pg">개인정보처리방침</h2><p class="hint">불편한 게시판이 어떤 정보를 받고 어떻게 쓰는지 알려드려요.</p>'
- +'<div class="box"><b>받는 정보</b><ul><li>익명으로 이용할 때: 브라우저마다 자동으로 만들어지는 임시 계정 ID</li><li>이메일로 가입할 때: 이메일 주소, 비밀번호(암호화되어 저장돼요)</li><li>Google로 로그인할 때: Google이 전달하는 이메일 주소와 프로필 정보</li><li>이용하면서: 직접 쓴 글, 댓글, 공감, 신고 내용</li></ul></div>'
+ +'<div class="box"><b>받는 정보</b><ul><li>익명으로 이용할 때: 브라우저마다 자동으로 만들어지는 임시 계정 ID</li><li>이메일로 가입할 때: 이메일 주소, 비밀번호(암호화되어 저장돼요)</li><li>Google로 로그인할 때: Google이 전달하는 이메일 주소와 프로필 정보</li><li>닉네임을 설정하면: 닉네임(글이나 댓글을 올릴 때 선택하면 다른 이용자에게 표시돼요)</li><li>이용하면서: 직접 쓴 글, 댓글, 공감, 신고 내용</li></ul></div>'
  +'<div class="box"><b>쓰는 목적</b><ul><li>로그인과 본인 글·댓글 삭제 권한 확인</li><li>게시판 운영과 신고 처리, 도배 방지</li></ul></div>'
  +'<div class="box"><b>보관과 삭제</b><ul><li>정보는 Supabase(데이터베이스 서비스)에 저장돼요.</li><li>글과 댓글은 작성자가 직접 삭제할 수 있어요. 삭제하면 해당 글의 댓글과 공감도 함께 지워져요.</li><li>이메일 주소는 다른 이용자에게 보이지 않아요. 댓글과 글은 익명으로 표시돼요.</li><li>계정 삭제를 원하면 운영자에게 요청해 주세요.</li></ul></div>'
  +'<div class="box"><b>제3자 제공</b><p style="margin:6px 0 0">법령에 따른 경우를 제외하고 받은 정보를 외부에 제공하지 않아요. 로그인에는 Google, 데이터 저장에는 Supabase를 이용해요.</p></div>'}
@@ -150,12 +152,12 @@ function admin(){
  return h+'<div class="box"><b>공유 데이터베이스 연결됨</b><p style="margin:6px 0 0">현재 게시판에 표시된 글 '+st.posts.length+'개</p></div>'
  +'<div class="box warn"><b>운영자 전용 관리</b><p style="margin:6px 0 0">게시글 숨김·삭제는 공개 페이지에서 누구나 실행할 수 없도록 잠겨 있어요. 신고 검토는 Supabase 대시보드에서 해주세요.</p></div>'
  +'<a class="btn ghost" style="display:inline-block;text-decoration:none" href="https://supabase.com/dashboard/project/kgbsbjxowacybxzkggcj/editor">Supabase에서 게시글 관리</a>'}
-function modal(h){var o=document.getElementById("ov");document.getElementById("md").innerHTML=h;o.classList.add("on")}
-function closeM(){document.getElementById("ov").classList.remove("on")}
+function modal(h){nickRequired=false;var o=document.getElementById("ov");document.getElementById("md").innerHTML=h;o.classList.add("on")}
+function closeM(){nickRequired=false;document.getElementById("ov").classList.remove("on")}
 function authModal(mode,email){
  if(mode==="verify"){modal('<h2>메일을 확인해 주세요</h2><p class="hint">'+esc(email||"")+' 주소로 인증 링크를 보냈어요. 메일을 확인하고 이 브라우저에서 링크를 열면 기존 글과 댓글이 계정에 연결됩니다. 메일이 안 보이면 스팸함도 확인해 주세요.</p><div class="row"><button class="btn" data-a="x">확인</button></div>');return}
  var title=mode==="password"?"비밀번호 설정":mode==="signup"?"회원가입":"로그인";
- if(mode==="account"){modal('<h2>로그인된 계정</h2><p class="hint">'+esc(currentUserEmail)+'</p><div class="row"><button class="btn ghost" data-a="x">닫기</button><button class="btn ghost" data-a="authmode" data-v="password">비밀번호 설정·변경</button><button class="btn" data-a="authout">로그아웃</button></div>');return}
+ if(mode==="account"){modal('<h2>로그인된 계정</h2><p class="hint">'+esc(currentUserEmail)+'</p>'+(myNick?'<p class="hint">닉네임: '+esc(myNick)+'</p>':'')+'<div class="row"><button class="btn ghost" data-a="x">닫기</button><button class="btn ghost" data-a="nick">닉네임 설정·변경</button><button class="btn ghost" data-a="authmode" data-v="password">비밀번호 설정·변경</button><button class="btn" data-a="authout">로그아웃</button></div>');return}
  var switcher=mode==="password"?'':'<div class="chips" style="margin:12px 0"><button class="chip '+(mode==="login"?"on":"")+'" data-a="authmode" data-v="login">로그인</button><button class="chip '+(mode==="signup"?"on":"")+'" data-a="authmode" data-v="signup">회원가입</button></div>';
  var body=mode==="signup"?'<p class="hint">이메일 인증 메일 없이 가입해요. 이메일 주소가 실제 본인 것인지 확인하지 않으니, 비밀번호를 잊었을 때 복구하기 어려울 수 있어요. 가입하면 이 브라우저의 익명 임시 계정과 별도의 계정이 만들어져, 이전에 익명으로 쓴 글·댓글의 작성자 권한은 이어지지 않을 수 있어요.</p><label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com"><label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="new-password" minlength="8" placeholder="8자 이상"><label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">'
   :'<p class="hint">'+(mode==="password"?"사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
@@ -167,6 +169,9 @@ function authModal(mode,email){
 function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
 function setUserSession(session){var u=session&&session.user;currentUserId=u?u.id:null;currentUserEmail=u&&u.email||"";currentIsAnonymous=!u||!!u.is_anonymous}
 function oauthReturnError(){var q=new URLSearchParams(location.search),h=new URLSearchParams(location.hash.replace(/^#/,""));return q.get("error_description")||h.get("error_description")||""}
+function nickModal(required){modal('<h2>닉네임 설정</h2>'+(required?'<p class="hint"><b>로그인됐어요!</b> 사용할 닉네임을 먼저 정해 주세요.</p>':'')+'<p class="hint">2~12자, 한글·영문·숫자·밑줄(_)만 쓸 수 있어요. 이미 쓰고 있는 닉네임은 사용할 수 없어요. 닉네임은 글이나 댓글을 올릴 때 직접 선택해야만 표시돼요.</p>'
+ +'<label for="nn">닉네임</label><input id="nn" maxlength="12" autocomplete="off" value="'+esc(myNick)+'" placeholder="예) 퇴근하고싶다"><div class="err" id="nerr" aria-live="polite"></div>'
+ +'<div class="row">'+(required?'<button class="btn ghost" data-a="authout">로그아웃</button>':'<button class="btn ghost" data-a="x">취소</button>')+'<button class="btn" data-a="nicksave">저장</button></div>');nickRequired=!!required}
 function pendingEmail(){try{return localStorage.getItem("painboard_pending_email")}catch(e){return""}}
 function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">익명으로 올라가요. 마음 편히 써주세요.</p>'
  +'<div class="box warn" style="font-size:14px;margin:10px 0"><b>올리기 전에 확인해 주세요</b><ul style="margin:6px 0 0"><li>실명, 전화번호, 주소, 계정 정보는 쓰지 마세요.</li><li>상대의 이름이나 알아볼 만한 세부 정보는 “상사”, “손님”처럼 바꿔 쓰거나 빼주세요.</li><li>특정인을 괴롭히거나 위협하는 글, 혐오 표현, 보복을 부추기는 글은 올릴 수 없어요.</li></ul></div>'
@@ -174,7 +179,7 @@ function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">�
  +'<label for="wt">제목</label><input id="wt" maxlength="40" placeholder="한 줄로 요약해 주세요">'
  +'<label for="wb">내용</label><textarea id="wb" maxlength="1000" rows="6" placeholder="어떤 일이 있었고, 마음이 어땠는지 편하게 적어주세요."></textarea>'
  +'<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="wa" style="width:auto;margin-top:5px"><span>이용 규칙을 읽었고 동의해요. <a href="#rules" data-a="x" style="color:inherit">규칙 보기</a></span></label>'
- +'<div class="err" id="we"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="post">올리기</button></div>')}
+ +(currentUserId&&!currentIsAnonymous?(myNick?'<label class="nk"><input type="checkbox" id="wn"> 닉네임('+esc(myNick)+')으로 올리기</label>':'<p class="hint">닉네임으로 글을 올리고 싶다면 <button class="lnk" data-a="nick" type="button">닉네임 설정</button></p>'):'')+'<div class="err" id="we"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="post">올리기</button></div>')}
 function rp(id,cid){modal('<h2>신고하기</h2><p class="hint">운영자가 확인할 수 있도록 이유를 알려주세요.</p><label for="rr">신고 사유</label><select id="rr">'+REASONS.map(function(r){return'<option>'+r+'</option>'}).join("")+'</select><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="sendrep" data-id="'+id+'"'+(cid?' data-c="'+cid+'"':'')+'>신고 접수</button></div>')}
 function fp(id){return st.posts.filter(function(p){return p.id==id})[0]}
 function voter(){return currentUserId}
@@ -193,14 +198,20 @@ async function refresh(){
   var err=results.filter(function(x){return x.error})[0];if(err)throw err.error;
   comments=results[0].data||[];reactions=results[1].data||[];
  }
- var my={},posts=rows.map(function(row){var p={id:row.id,author_id:row.author_id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
+ var aids={};rows.forEach(function(r){aids[r.author_id]=1});comments.forEach(function(c){aids[c.author_id]=1});
+ if(currentUserId&&!currentIsAnonymous)aids[currentUserId]=1;
+ nickMap={};var al=Object.keys(aids);
+ if(al.length){var pq=await sb.from("board_profiles").select("user_id,nickname").in("user_id",al);nickTableOk=!pq.error;if(!pq.error)(pq.data||[]).forEach(function(x){nickMap[x.user_id]=x.nickname})}
+ myNick=currentUserId&&!currentIsAnonymous?(nickMap[currentUserId]||""):"";
+ var my={},posts=rows.map(function(row){var p={id:row.id,author_id:row.author_id,sn:row.show_nickname,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
   reactions.filter(function(r){return r.post_id===row.id}).forEach(function(r){p.r[r.reaction]++;if(r.voter_key===voter())my[p.id+r.reaction]=1});
-  p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,author_id:c.author_id,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
+  p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,author_id:c.author_id,sn:c.show_nickname,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
  st={n:0,my:my,posts:posts};render();
+ if(nickTableOk&&currentUserId&&!currentIsAnonymous&&!myNick&&!nickRequired&&!document.getElementById("ov").classList.contains("on"))nickModal(true);
 }
 function dbError(err){console.error("Supabase request failed",err);var m=err&&err.message||"";if(err&&err.code==="23505"){toast("이미 신고하셨어요.");return}if(/rate limit/i.test(m)){toast("잠시 쉬었다가 다시 올려주세요. 짧은 시간에 너무 많이 올렸어요.");return}toast("연결 오류: 잠시 후 다시 시도해 주세요.")}
 async function send(action){try{await action();await refresh();return true}catch(err){dbError(err);return false}}
-document.addEventListener("click",async function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
+document.addEventListener("click",async function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov"&&!nickRequired)closeM();return}
  var a=b.dataset.a,id=b.dataset.id,cid=b.dataset.c,p=id?fp(id):null;
  if(a==="x"){closeM();return}
  if(a==="auth"){var pending=pendingEmail();authModal(pending&&currentUserId&&!currentIsAnonymous?"password":currentIsAnonymous?"login":"account",pending||currentUserEmail);return}
@@ -220,6 +231,12 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
    else {var changed=await sb.auth.updateUser({password:pass});if(changed.error)throw changed.error;try{localStorage.removeItem("painboard_pending_email")}catch(e){};var sessionResult=await sb.auth.getSession();setUserSession(sessionResult.data.session);await refresh();closeM();toast("비밀번호가 저장됐어요.")}
   }catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return
  }
+ if(a==="nick"){if(!currentUserId||currentIsAnonymous){toast("로그인 후 설정할 수 있어요.");return}nickModal();return}
+ if(a==="nicksave"){if(authBusy)return;var nn=((document.getElementById("nn")||{}).value||"").trim(),ne=document.getElementById("nerr");
+  if(!/^[0-9A-Za-z가-힣_]{2,12}$/.test(nn)){ne.textContent="2~12자의 한글·영문·숫자·밑줄(_)만 사용할 수 있어요.";return}
+  if(/^(admin|administrator|운영자|관리자|운영진|익명)$/i.test(nn)){ne.textContent="사용할 수 없는 닉네임이에요.";return}
+  authBusy=true;b.disabled=true;try{var nr=await sb.from("board_profiles").upsert({user_id:currentUserId,nickname:nn});if(nr.error)throw nr.error;await refresh();closeM();toast("닉네임이 저장됐어요.")}
+  catch(err){b.disabled=false;ne.textContent=err&&err.code==="23505"?"이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해 주세요.":(/row-level security|policy/i.test(err&&err.message||"")?"로그인한 계정만 설정할 수 있어요.":"저장하지 못했어요. 잠시 후 다시 시도해 주세요.")}finally{authBusy=false}return}
  if(a==="write"){wr();return}
  if(a==="cat"){cat=b.dataset.v;postLimit=20;await send(async function(){})}
  else if(a==="more"){postLimit+=20;await send(async function(){})}
@@ -233,17 +250,17 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
  else if(a==="cmt"){if(commentLocks[id]||Date.now()<(commentCooldowns[id]||0))return;var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
   if(t.length<2){er.textContent="댓글을 입력해 주세요.";return}
   var m=pii(t);if(m){er.textContent=m;return}
-  commentLocks[id]=true;b.disabled=true;var didComment=await send(async function(){var x=await sb.from("board_comments").insert({post_id:id,body:t});if(x.error)throw x.error});commentLocks[id]=false;
+  commentLocks[id]=true;b.disabled=true;var didComment=await send(async function(){var x=await sb.from("board_comments").insert(Object.assign({post_id:id,body:t},(document.getElementById("cmn"+id)||{}).checked?{show_nickname:true}:{}));if(x.error)throw x.error});commentLocks[id]=false;
   if(didComment){commentCooldowns[id]=Date.now()+1500;toast("따뜻한 댓글이 등록되었어요.")}else b.disabled=false}
  else if(a==="post"){if(posting||Date.now()<postCooldownUntil)return;var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
   if(!t||c.length<10){er.textContent="제목과 내용을 입력해 주세요. 내용은 10자 이상 적어주세요.";return}
   var m=pii(t+" "+c);if(m){er.textContent=m;return}
   if(!document.getElementById("wa").checked){er.textContent="글을 올리려면 이용 규칙에 동의해 주세요.";return}
-  posting=true;b.disabled=true;var didPost=await send(async function(){var x=await sb.from("board_posts").insert({title:t,body:c,category:document.getElementById("wc").value});if(x.error)throw x.error});posting=false;
+  posting=true;b.disabled=true;var didPost=await send(async function(){var x=await sb.from("board_posts").insert(Object.assign({title:t,body:c,category:document.getElementById("wc").value},(document.getElementById("wn")||{}).checked?{show_nickname:true}:{}));if(x.error)throw x.error});posting=false;
   if(didPost){postCooldownUntil=Date.now()+2500;closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}else b.disabled=false}
  render()});
-document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
-window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&!nickRequired)closeM()});
+window.addEventListener("hashchange",function(){if(!nickRequired)closeM();render();window.scrollTo(0,0)});
 st={n:0,my:{},posts:[]};render();
 async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();
  var oe=oauthReturnError();
