@@ -161,7 +161,7 @@ function authModal(mode,email){
   :'<p class="hint">'+(mode==="password"?"사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
    +'<label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" minlength="8" placeholder="8자 이상">'+(mode==="password"?'<label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">':'');
  var action=mode==="signup"?"가입하기":mode==="password"?"비밀번호 저장":"로그인";
- var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" type="button"><span class="google-mark" aria-hidden="true">G</span>Google로 계속하기</button><p class="hint">처음 쓰는 Google 계정이면 이 브라우저에서 익명으로 쓴 글과 댓글이 이어져요. 이미 가입한 계정으로 로그인하면 이어지지 않아요.</p></div>';
+ var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" data-v="'+mode+'" type="button"><span class="google-mark" aria-hidden="true">G</span>'+(mode==="signup"?"Google로 가입하기":"Google로 로그인")+'</button><p class="hint">'+(mode==="signup"?"처음 쓰는 Google 계정만 가입돼요. 이 브라우저에서 익명으로 쓴 글과 댓글이 이어져요. 이미 가입했다면 로그인 탭을 이용해 주세요.":"이미 가입한 Google 계정으로 로그인해요. 이 브라우저에서 익명으로 쓴 글은 이어지지 않아요.")+'</p></div>';
  modal('<h2>'+title+'</h2>'+switcher+body+google+'<div class="err" id="aeerr" aria-live="polite"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="authsubmit" data-v="'+mode+'">'+action+'</button></div>')
 }
 function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
@@ -205,7 +205,7 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
  if(a==="x"){closeM();return}
  if(a==="auth"){var pending=pendingEmail();authModal(pending&&currentUserId&&!currentIsAnonymous?"password":currentIsAnonymous?"login":"account",pending||currentUserEmail);return}
  if(a==="authmode"){authModal(b.dataset.v);return}
- if(a==="googleauth"){if(authBusy)return;authBusy=true;b.disabled=true;try{var oauth;if(currentUserId&&currentIsAnonymous){oauth=await sb.auth.linkIdentity({provider:"google",options:{redirectTo:SITE_URL}});if(oauth.error)oauth=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}})}else{oauth=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}})}if(oauth.error)throw oauth.error}catch(err){authBusy=false;b.disabled=false;var googleErr=document.getElementById("aeerr");if(googleErr)googleErr.textContent=authMessage(err)}return}
+ if(a==="googleauth"){if(authBusy)return;authBusy=true;b.disabled=true;try{var oauth,gopt={provider:"google",options:{redirectTo:SITE_URL}};if(b.dataset.v==="signup"&&currentUserId&&currentIsAnonymous){oauth=await sb.auth.linkIdentity(gopt)}else{oauth=await sb.auth.signInWithOAuth(gopt)}if(oauth.error)throw oauth.error}catch(err){authBusy=false;b.disabled=false;var googleErr=document.getElementById("aeerr");if(googleErr)googleErr.textContent=authMessage(err)}return}
  if(a==="authout"){if(authBusy)return;if(!confirm("로그아웃할까요?"))return;authBusy=true;try{await sb.auth.signOut();var anon=await sb.auth.signInAnonymously();if(anon.error)throw anon.error;setUserSession(anon.data.session);await refresh();closeM();toast("로그아웃했어요.")}catch(err){toast(authMessage(err))}finally{authBusy=false}return}
  if(a==="authsubmit"){
   if(authBusy)return;var mode=b.dataset.v,email=(mode==="password"?currentUserEmail:(document.getElementById("ae")||{}).value||"").trim().toLowerCase(),pass=(document.getElementById("ap")||{}).value||"",errBox=document.getElementById("aeerr");
@@ -248,10 +248,8 @@ st={n:0,my:{},posts:[]};render();
 async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();
  var oe=oauthReturnError();
  if(oe){try{history.replaceState(null,"",location.pathname)}catch(e){}
-  var retried="";try{retried=sessionStorage.getItem("painboard_oauth_retry")}catch(e){}
-  if(/already|linked|exists|identity/i.test(oe)&&!retried){try{sessionStorage.setItem("painboard_oauth_retry","1")}catch(e){}toast("이미 가입된 Google 계정이에요. 로그인으로 이어갈게요.");var again=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}});if(again.error)toast(authMessage(again.error));return}
-  toast("Google 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.")}
- else if(!currentIsAnonymous){try{sessionStorage.removeItem("painboard_oauth_retry")}catch(e){}}
+  if(/already|linked|exists|identity/i.test(oe)){authModal("login");var dupBox=document.getElementById("aeerr");if(dupBox)dupBox.textContent="이미 가입된 Google 계정이에요. 아래 'Google로 로그인'을 눌러 로그인해 주세요."}
+  else toast("Google 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.")}
  var pending=pendingEmail();if(pending&&session.user&&!session.user.is_anonymous&&session.user.email&&session.user.email.toLowerCase()===pending.toLowerCase())setTimeout(function(){authModal("password",pending)},250)}
 startBoard().catch(function(e){dbError(e)});
 sb.channel("board-live-updates").on("postgres_changes",{event:"*",schema:"public",table:"board_posts"},function(){refresh().catch(dbError)})
