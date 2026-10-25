@@ -217,3 +217,25 @@ create policy "Signed-in accounts can submit reports" on public.board_reports fo
     reporter_id = auth.uid()
     and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
   );
+
+-- ===== Replies: one level only (a reply targets a top-level comment on the same post) =====
+alter table public.board_comments add column if not exists parent_id uuid references public.board_comments(id) on delete cascade;
+create index if not exists board_comments_parent_idx on public.board_comments (parent_id);
+
+create or replace function public.board_check_comment_parent() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare pp record;
+begin
+  if new.parent_id is not null then
+    select post_id, parent_id into pp from public.board_comments where id = new.parent_id;
+    if not found or pp.post_id <> new.post_id or pp.parent_id is not null then
+      raise exception 'invalid reply target';
+    end if;
+  end if;
+  return new;
+end $$;
+revoke execute on function public.board_check_comment_parent() from public, anon, authenticated;
+
+drop trigger if exists board_comments_parent_check on public.board_comments;
+create trigger board_comments_parent_check before insert on public.board_comments
+  for each row execute function public.board_check_comment_parent();

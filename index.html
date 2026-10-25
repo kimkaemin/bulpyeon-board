@@ -55,6 +55,7 @@ h1 span{background:linear-gradient(transparent 58%,var(--hl) 58%);padding:0 4px}
 .cm{margin-top:10px;border-top:1px dashed rgba(0,0,0,.2);padding-top:10px}
 .cmi{background:rgba(255,255,255,.65);color:#26324a;border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:15px}
 .cmi small{display:block;color:#5d6b85}
+.cmi.reply{margin-left:22px;border-left:3px solid var(--line)}.cmi .rform{margin-top:8px}.cmi .rform textarea{min-height:64px}
 .hid{opacity:.6;font-style:italic}
 input,textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 textarea{resize:vertical;min-height:90px}
@@ -94,7 +95,7 @@ var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
 var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
 var SITE_URL="https://kimkaemin.github.io/bulpyeon-board/";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-var st=null,sort="new",cat="전체",openId=null,postLimit=20,hasMore=false,myNick="",nickMap={},nickRequired=false,nickTableOk=false,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
+var st=null,sort="new",cat="전체",openId=null,postLimit=20,hasMore=false,myNick="",nickMap={},nickRequired=false,nickTableOk=false,replyTo=null,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
 function who(uid){return nickMap[uid]?esc(nickMap[uid]):"익명"}
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
 function ago(t){var m=Math.floor((Date.now()-t)/6e4);if(m<1)return"방금 전";if(m<60)return m+"분 전";var h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전"}
@@ -115,7 +116,7 @@ function nav(){var h=location.hash.replace("#","")||"home";
  document.getElementById("nav").innerHTML=links+auth}
 function render(){nav();var h=location.hash.replace("#","")||"home",a=document.getElementById("app");
  var drafts={},active=document.activeElement&&document.activeElement.id,pos=null;
- a.querySelectorAll("textarea[id^=cmt]").forEach(function(t){if(t.value)drafts[t.id]=t.value});
+ a.querySelectorAll("textarea[id^=cmt],textarea[id^=rpl]").forEach(function(t){if(t.value)drafts[t.id]=t.value});
  if(active&&drafts[active]){var el=document.getElementById(active);pos=[el.selectionStart,el.selectionEnd]}
  a.innerHTML=h==="rules"?rules():h==="admin"?admin():h==="privacy"?privacy():home();
  Object.keys(drafts).forEach(function(id){var t=document.getElementById(id);if(t)t.value=drafts[id]});
@@ -128,13 +129,17 @@ function home(){
  +'<div class="chips"><button class="chip '+(sort==="new"?"on":"")+'" data-a="sort" data-v="new">최신순</button><button class="chip '+(sort==="like"?"on":"")+'" data-a="sort" data-v="like">공감순</button></div></div>'
  +(ps.length?ps.map(note).join(""):'<div class="empty">아직 이 분류에는 글이 없어요.<br>첫 이야기를 들려주시겠어요?</div>')
  +(hasMore?'<div class="row" style="justify-content:center;margin-top:16px"><button class="btn ghost" data-a="more">글 더 보기</button></div>':'')}
-function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h});
+function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h}),tops=cm.filter(function(c){return !c.pid}),reps={};
+ cm.forEach(function(c){if(c.pid)(reps[c.pid]||(reps[c.pid]=[])).push(c)});
+ var shown=tops.reduce(function(n,c){return n+1+(reps[c.id]||[]).length},0);
  var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+who(p.author_id,p.sn)+' · '+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
  +'<div class="rx">'+RX.map(function(r){return'<button class="'+(st.my[p.id+r[0]]?"me":"")+'" data-a="rx" data-id="'+p.id+'" data-v="'+r[0]+'" aria-pressed="'+!!st.my[p.id+r[0]]+'">'+r[1]+" "+p.r[r[0]]+'</button>'}).join("")+'</div>'
- +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+cm.length+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button>'+(currentUserId&&p.author_id===currentUserId?'<button class="lnk" data-a="deletepost" data-id="'+p.id+'">삭제</button>':'')+'</div>';
- if(o){s+='<div class="cm">'+(cm.length?cm.map(function(c){return'<div class="cmi">'+esc(c.t)+'<small>'+who(c.author_id,c.sn)+' · '+ago(c.ts)+' · <button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button>'+(currentUserId&&c.author_id===currentUserId?' · <button class="lnk" data-a="deletecomment" data-id="'+p.id+'" data-c="'+c.id+'">삭제</button>':'')+'</small></div>'}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
+ +'<div class="foot"><button class="lnk" data-a="open" data-id="'+p.id+'">'+(o?"접기":"댓글 "+shown+"개 · 전체 보기")+'</button><button class="lnk" data-a="rep" data-id="'+p.id+'">신고</button>'+(currentUserId&&p.author_id===currentUserId?'<button class="lnk" data-a="deletepost" data-id="'+p.id+'">삭제</button>':'')+'</div>';
+ if(o){s+='<div class="cm">'+(tops.length?tops.map(function(c){return cmItem(p,c,false)+(reps[c.id]||[]).map(function(r){return cmItem(p,r,true)}).join("")}).join(""):'<p class="hint">아직 댓글이 없어요. 따뜻한 한마디를 남겨주세요.</p>')
  +'<label for="cmt'+p.id+'">위로와 공감의 말을 남겨주세요</label><textarea id="cmt'+p.id+'" maxlength="300" placeholder="예) 정말 속상했겠어요. 오늘은 푹 쉬세요."></textarea><div class="err" id="ce'+p.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="cmt" data-id="'+p.id+'">댓글 남기기</button></div></div>'}
  return s+'</article>'}
+function cmItem(p,c,isReply){return'<div class="cmi'+(isReply?' reply':'')+'">'+esc(c.t)+'<small>'+who(c.author_id,c.sn)+' · '+ago(c.ts)+' · '+(isReply?'':'<button class="lnk" data-a="reply" data-id="'+p.id+'" data-c="'+c.id+'">'+(replyTo===c.id?"답글 취소":"답글")+'</button> · ')+'<button class="lnk" data-a="rep" data-id="'+p.id+'" data-c="'+c.id+'">신고</button>'+(currentUserId&&c.author_id===currentUserId?' · <button class="lnk" data-a="deletecomment" data-id="'+p.id+'" data-c="'+c.id+'">삭제</button>':'')+'</small>'
+ +(!isReply&&replyTo===c.id?'<div class="rform"><textarea id="rpl'+c.id+'" maxlength="300" placeholder="답글을 입력해 주세요"></textarea><div class="err" id="re'+c.id+'"></div><div class="row" style="margin-top:6px"><button class="btn sm" data-a="sendreply" data-id="'+p.id+'" data-c="'+c.id+'">답글 남기기</button></div></div>':'')+'</div>'}
 function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기는 감정을 내려놓는 곳이에요. 누군가를 공격하는 곳이 아니라, 마음을 안전하게 꺼내 놓는 곳이에요.</p>'
  +'<div class="box warn"><b>이런 글은 올릴 수 없어요</b><ul><li>실명, 전화번호, 주소, 계정·아이디, 회사·학교 이름 등 개인을 알아볼 수 있는 정보</li><li>특정인을 괴롭히거나 위협하는 글</li><li>성별, 지역, 나이, 장애, 출신 등에 대한 혐오 표현</li><li>보복이나 신상 공개를 부추기는 내용</li><li>광고, 링크, 반복 도배</li></ul></div>'
  +'<div class="box"><b>이렇게 써주세요</b><ul><li>상대의 이름 대신 “상사”, “옆자리 손님”처럼 바꿔 써요.</li><li>누가 봐도 알 만한 시간, 장소, 사건 정보는 조금 바꾸거나 빼요.</li><li>상대를 평가하기보다 내가 겪은 일과 내 마음을 중심으로 써요.</li></ul></div>'
@@ -205,7 +210,7 @@ async function refresh(){
  myNick=currentUserId&&!currentIsAnonymous?(nickMap[currentUserId]||""):"";
  var my={},posts=rows.map(function(row){var p={id:row.id,author_id:row.author_id,sn:row.show_nickname,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
   reactions.filter(function(r){return r.post_id===row.id}).forEach(function(r){p.r[r.reaction]++;if(r.voter_key===voter())my[p.id+r.reaction]=1});
-  p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,author_id:c.author_id,sn:c.show_nickname,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
+  p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,author_id:c.author_id,pid:c.parent_id,sn:c.show_nickname,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
  st={n:0,my:my,posts:posts};render();
  if(nickTableOk&&currentUserId&&!currentIsAnonymous&&!myNick&&!nickRequired&&!document.getElementById("ov").classList.contains("on"))nickModal(true);
 }
@@ -231,7 +236,7 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
    else {var changed=await sb.auth.updateUser({password:pass});if(changed.error)throw changed.error;try{localStorage.removeItem("painboard_pending_email")}catch(e){};var sessionResult=await sb.auth.getSession();setUserSession(sessionResult.data.session);await refresh();closeM();toast("비밀번호가 저장됐어요.")}
   }catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return
  }
- if(/^(write|rx|cmt|rep|sendrep|post)$/.test(a)&&(!currentUserId||currentIsAnonymous)){authModal("login");var gerr=document.getElementById("aeerr");if(gerr)gerr.textContent="로그인 후 이용할 수 있어요.";return}
+ if(/^(write|rx|cmt|reply|sendreply|rep|sendrep|post)$/.test(a)&&(!currentUserId||currentIsAnonymous)){authModal("login");var gerr=document.getElementById("aeerr");if(gerr)gerr.textContent="로그인 후 이용할 수 있어요.";return}
  if(a==="nick"){if(!currentUserId||currentIsAnonymous){toast("로그인 후 설정할 수 있어요.");return}nickModal();return}
  if(a==="nicksave"){if(authBusy)return;var nn=((document.getElementById("nn")||{}).value||"").trim(),ne=document.getElementById("nerr");
   if(!/^[0-9A-Za-z가-힣_]{2,12}$/.test(nn)){ne.textContent="2~12자의 한글·영문·숫자·밑줄(_)만 사용할 수 있어요.";return}
@@ -242,10 +247,11 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
  if(a==="cat"){cat=b.dataset.v;postLimit=20;await send(async function(){})}
  else if(a==="more"){postLimit+=20;await send(async function(){})}
  else if(a==="sort"){sort=b.dataset.v}
- else if(a==="open"){openId=openId==p.id?null:p.id}
+ else if(a==="open"){openId=openId==p.id?null:p.id;replyTo=null}
+ else if(a==="reply"){replyTo=replyTo===cid?null:cid;setTimeout(function(){var t=document.getElementById("rpl"+replyTo);if(t)t.focus()},0)}
  else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v,removing=!!st.my[k];if(!currentUserId){toast("잠시 후 다시 눌러주세요.")}else if(await send(async function(){var q=removing?await sb.from("board_reactions").delete().eq("post_id",p.id).eq("reaction",v).eq("voter_key",voter()):await sb.from("board_reactions").insert({post_id:p.id,reaction:v,voter_key:voter()});if(q.error)throw q.error}))toast(removing?"공감을 취소했어요.":"공감이 전달됐어요.")}
  else if(a==="deletepost"){if(!p||p.author_id!==currentUserId){toast("작성자만 글을 삭제할 수 있어요.")}else if(confirm("정말 이 글을 삭제할까요? 댓글과 공감도 함께 삭제돼요.")){if(await send(async function(){var x=await sb.from("board_posts").delete().eq("id",p.id);if(x.error)throw x.error})){openId=null;toast("글을 삭제했어요.")}}}
- else if(a==="deletecomment"){var cm=p&&p.cm.filter(function(x){return x.id===cid})[0];if(!cm||cm.author_id!==currentUserId){toast("작성자만 댓글을 삭제할 수 있어요.")}else if(confirm("이 댓글을 삭제할까요?")){if(await send(async function(){var x=await sb.from("board_comments").delete().eq("id",cid).eq("post_id",p.id);if(x.error)throw x.error}))toast("댓글을 삭제했어요.")}}
+ else if(a==="deletecomment"){var cm=p&&p.cm.filter(function(x){return x.id===cid})[0];if(!cm||cm.author_id!==currentUserId){toast("작성자만 댓글을 삭제할 수 있어요.")}else if(confirm(p.cm.some(function(x){return x.pid===cid})?"이 댓글을 삭제할까요? 달린 답글도 함께 삭제돼요.":"이 댓글을 삭제할까요?")){if(await send(async function(){var x=await sb.from("board_comments").delete().eq("id",cid).eq("post_id",p.id);if(x.error)throw x.error}))toast("댓글을 삭제했어요.")}}
  else if(a==="rep"){rp(id,cid);return}
  else if(a==="sendrep"){var reason=document.getElementById("rr").value;var q=await send(async function(){var x=await sb.from("board_reports").insert({post_id:id,comment_id:cid||null,reason:reason});if(x.error)throw x.error});if(q){closeM();toast("신고가 접수됐어요. 운영자가 검토할게요.")}}
  else if(a==="cmt"){if(commentLocks[id]||Date.now()<(commentCooldowns[id]||0))return;var ta=document.getElementById("cmt"+id),t=ta.value.trim(),er=document.getElementById("ce"+id);
@@ -253,6 +259,11 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
   var m=pii(t);if(m){er.textContent=m;return}
   commentLocks[id]=true;b.disabled=true;var didComment=await send(async function(){var x=await sb.from("board_comments").insert({post_id:id,body:t});if(x.error)throw x.error});commentLocks[id]=false;
   if(didComment){commentCooldowns[id]=Date.now()+1500;toast("따뜻한 댓글이 등록되었어요.")}else b.disabled=false}
+ else if(a==="sendreply"){if(commentLocks[cid]||Date.now()<(commentCooldowns[cid]||0))return;var rta=document.getElementById("rpl"+cid),rt=rta.value.trim(),rer=document.getElementById("re"+cid);
+  if(rt.length<2){rer.textContent="답글을 입력해 주세요.";return}
+  var rm=pii(rt);if(rm){rer.textContent=rm;return}
+  commentLocks[cid]=true;b.disabled=true;var didReply=await send(async function(){var x=await sb.from("board_comments").insert({post_id:id,body:rt,parent_id:cid});if(x.error)throw x.error});commentLocks[cid]=false;
+  if(didReply){commentCooldowns[cid]=Date.now()+1500;replyTo=null;toast("답글이 등록되었어요.")}else b.disabled=false}
  else if(a==="post"){if(posting||Date.now()<postCooldownUntil)return;var t=document.getElementById("wt").value.trim(),c=document.getElementById("wb").value.trim(),er=document.getElementById("we");
   if(!t||c.length<10){er.textContent="제목과 내용을 입력해 주세요. 내용은 10자 이상 적어주세요.";return}
   var m=pii(t+" "+c);if(m){er.textContent=m;return}
