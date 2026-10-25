@@ -182,3 +182,38 @@ grant insert, update on public.board_profiles to authenticated;
 
 alter table public.board_posts add column if not exists show_nickname boolean not null default false;
 alter table public.board_comments add column if not exists show_nickname boolean not null default false;
+
+-- ===== Writing requires a real (non-anonymous) account; posts and comments also require a nickname =====
+drop policy if exists "Signed-in visitors can publish posts" on public.board_posts;
+drop policy if exists "Signed-in accounts can publish posts" on public.board_posts;
+create policy "Signed-in accounts can publish posts" on public.board_posts for insert to authenticated
+  with check (
+    auth.uid() = author_id
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+    and exists (select 1 from public.board_profiles p where p.user_id = auth.uid())
+  );
+
+drop policy if exists "Signed-in visitors can write comments" on public.board_comments;
+drop policy if exists "Signed-in accounts can write comments" on public.board_comments;
+create policy "Signed-in accounts can write comments" on public.board_comments for insert to authenticated
+  with check (
+    auth.uid() = author_id
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+    and exists (select 1 from public.board_profiles p where p.user_id = auth.uid())
+  );
+
+drop policy if exists "Signed-in visitors can react" on public.board_reactions;
+drop policy if exists "Signed-in accounts can react" on public.board_reactions;
+create policy "Signed-in accounts can react" on public.board_reactions for insert to authenticated
+  with check (
+    voter_key = auth.uid()::text
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
+
+drop policy if exists "Signed-in visitors can submit reports" on public.board_reports;
+drop policy if exists "Signed-in accounts can submit reports" on public.board_reports;
+create policy "Signed-in accounts can submit reports" on public.board_reports for insert to authenticated
+  with check (
+    reporter_id = auth.uid()
+    and coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) = false
+  );
