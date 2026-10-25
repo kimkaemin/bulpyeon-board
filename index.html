@@ -248,7 +248,7 @@ st={n:0,my:{},posts:[]};render();
 async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();
  var oe=oauthReturnError();
  if(oe){try{history.replaceState(null,"",location.pathname)}catch(e){}
-  if(/already|linked|exists|identity/i.test(oe)){authModal("login");var dupBox=document.getElementById("aeerr");if(dupBox)dupBox.textContent="이미 가입된 Google 계정이에요. 아래 'Google로 로그인'을 눌러 로그인해 주세요."}
+  if(/already|linked|exists|identity/i.test(oe)){authModal("signup");var dupBox=document.getElementById("aeerr");if(dupBox)dupBox.textContent="이미 가입된 Google 계정이에요. 다른 계정으로 가입하려면 'Google로 가입하기'를 누르고 '다른 계정 사용'을 선택해 주세요. 이 계정으로 로그인하려면 위의 '로그인' 탭을 눌러 주세요."}
   else toast("Google 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.")}
  var pending=pendingEmail();if(pending&&session.user&&!session.user.is_anonymous&&session.user.email&&session.user.email.toLowerCase()===pending.toLowerCase())setTimeout(function(){authModal("password",pending)},250)}
 startBoard().catch(function(e){dbError(e)});
