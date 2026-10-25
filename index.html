@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>불편한 게시판</title>
+<meta name="description" content="오늘의 불편함을 익명으로 털어놓고, 위로받고, 가볍게 돌아가는 게시판">
+<meta property="og:type" content="website">
+<meta property="og:title" content="불편한 게시판">
+<meta property="og:description" content="오늘의 불편함을 익명으로 털어놓고, 위로받고, 가볍게 돌아가는 게시판">
+<meta property="og:url" content="https://kimkaemin.github.io/bulpyeon-board/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%93%9D%3C/text%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#eef3f8;--ink:#26324a;--sub:#5d6b85;--card:#fff;--line:#d5deea;--btn:#26324a;--btnt:#fff;--hl:#ffd66b;
@@ -67,6 +73,7 @@ label{display:block;margin:12px 0 4px;font-size:15px}
 h2.pg{font-weight:400;font-size:30px;margin:26px 0 6px}
 ol,ul{padding-left:20px}li{margin:6px 0}
 .adm{border-left:6px solid var(--err)}
+#foot{padding:32px 0 8px;text-align:center;font-size:14px}#foot a{color:var(--sub)}
 @media (prefers-reduced-motion:no-preference){.note{transition:transform .15s}.note:hover{transform:rotate(-.4deg)}}
 </style>
 </head>
@@ -74,6 +81,7 @@ ol,ul{padding-left:20px}li{margin:6px 0}
 <div class="wrap">
 <nav id="nav"></nav>
 <main id="app"></main>
+<footer id="foot"><a href="#privacy">개인정보처리방침</a></footer>
 </div>
 <div id="ov"><div class="modal" id="md" role="dialog" aria-modal="true"></div></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -85,14 +93,7 @@ var SUPABASE_URL="https://kgbsbjxowacybxzkggcj.supabase.co";
 var SUPABASE_ANON_KEY="sb_publishable_bafEz7pqjNzOpJkTiTlpUQ_9td2aw3s";
 var SITE_URL="https://kimkaemin.github.io/bulpyeon-board/";
 var sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-var KEY="bulpyeon_v1",st=null,sort="new",cat="전체",openId=null,mem=null,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
-function ld(){try{var s=localStorage.getItem(KEY);if(s)return JSON.parse(s)}catch(e){}return mem}
-function sv(){mem=st}
-function seed(){var n=Date.now(),h=36e5;return{n:20,my:{},posts:[
-{id:1,t:"회의 끝나기 5분 전에 ‘잠깐만요’ 하는 사람",c:"퇴근 10분 전에 시작된 회의가 한 시간을 넘겼어요. 다들 말은 안 했지만 눈빛은 이미 집에 가 있었어요. 저만 이런 건 아니겠죠?",cat:"직장·학교",ts:n-3*h,r:{a:14,b:5,c:3},cm:[{id:2,t:"그 눈빛, 저도 알아요. 오늘은 맛있는 거 드세요.",ts:n-2*h,rp:[]}],rp:[]},
-{id:3,t:"배달 앱 별점은 5점인데 음식은 식어 있었어요",c:"비 오는 날 기다린 한 시간. 도착한 국물은 미지근했고 사과는 한마디도 없었어요. 따지기도 애매해서 그냥 먹었는데 계속 마음이 불편해요.",cat:"서비스·소비",ts:n-9*h,r:{a:9,b:11,c:2},cm:[],rp:[]},
-{id:4,t:"지하철에서 가방으로 밀치고 간 분께",c:"출근길 환승 구간에서 가방에 세게 맞았는데 돌아보지도 않고 가셨어요. 하루 종일 어깨가 얼얼했지만, 그 사람도 급했나 보다 하고 넘기려고요. 그래도 속상했어요.",cat:"교통·공공장소",ts:n-26*h,r:{a:6,b:4,c:7},cm:[],rp:[]},
-{id:5,t:"명절 안부 질문이 부담스러워요",c:"좋은 마음으로 물어보시는 건 알지만, 같은 질문을 매번 받으면 마음이 조금씩 닳아요. 올해는 웃으며 화제를 돌리는 연습을 해보려고요.",cat:"가족·친구",ts:n-50*h,r:{a:21,b:8,c:12},cm:[{id:6,t:"화제 돌리기 연습, 응원합니다. 저는 간식 이야기로 돌려요.",ts:n-40*h,rp:[]}],rp:[]}]}}
+var st=null,sort="new",cat="전체",openId=null,postLimit=20,hasMore=false,currentUserId=null,currentUserEmail="",currentIsAnonymous=true,posting=false,postCooldownUntil=0,commentLocks={},commentCooldowns={},authBusy=false;
 function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
 function ago(t){var m=Math.floor((Date.now()-t)/6e4);if(m<1)return"방금 전";if(m<60)return m+"분 전";var h=Math.floor(m/60);if(h<24)return h+"시간 전";return Math.floor(h/24)+"일 전"}
 function vis(p){return !p.h&&p.rp.length<3}
@@ -111,14 +112,20 @@ function nav(){var h=location.hash.replace("#","")||"home";
  var auth=currentUserId&&!currentIsAnonymous?'<button class="auth-nav" data-a="auth">'+(pending?"비밀번호 설정":esc(currentUserEmail||"내 계정"))+'</button><button class="auth-nav" data-a="authout">로그아웃</button>':'<button class="auth-nav" data-a="auth">로그인 · 회원가입</button>';
  document.getElementById("nav").innerHTML=links+auth}
 function render(){nav();var h=location.hash.replace("#","")||"home",a=document.getElementById("app");
- a.innerHTML=h==="rules"?rules():h==="admin"?admin():home();window.scrollTo&&0}
+ var drafts={},active=document.activeElement&&document.activeElement.id,pos=null;
+ a.querySelectorAll("textarea[id^=cmt]").forEach(function(t){if(t.value)drafts[t.id]=t.value});
+ if(active&&drafts[active]){var el=document.getElementById(active);pos=[el.selectionStart,el.selectionEnd]}
+ a.innerHTML=h==="rules"?rules():h==="admin"?admin():h==="privacy"?privacy():home();
+ Object.keys(drafts).forEach(function(id){var t=document.getElementById(id);if(t)t.value=drafts[id]});
+ if(active&&drafts[active]){var f=document.getElementById(active);if(f){f.focus();if(pos)f.setSelectionRange(pos[0],pos[1])}}}
 function home(){
  var ps=st.posts.filter(vis).filter(function(p){return cat==="전체"||p.cat===cat});
  ps.sort(function(x,y){return sort==="new"?y.ts-x.ts:total(y)-total(x)||y.ts-x.ts});
- return'<section class="hero"><h1><span>불편한</span> 게시판</h1><p>오늘의 불편함을 털어놓아 보세요</p><p class="hint">이름도 계정도 필요 없어요. 털어놓고, 위로받고, 가볍게 돌아가요.</p><button class="btn big" data-a="write">글쓰기</button></section>'
+ return'<section class="hero"><h1><span>불편한</span> 게시판</h1><p>오늘의 불편함을 털어놓아 보세요</p><p class="hint">로그인 없이도 쓸 수 있어요. 털어놓고, 위로받고, 가볍게 돌아가요.</p><button class="btn big" data-a="write">글쓰기</button></section>'
  +'<div class="bar"><div class="chips">'+["전체"].concat(CATS).map(function(c){return'<button class="chip '+(cat===c?"on":"")+'" data-a="cat" data-v="'+c+'">'+c+'</button>'}).join("")+'</div>'
  +'<div class="chips"><button class="chip '+(sort==="new"?"on":"")+'" data-a="sort" data-v="new">최신순</button><button class="chip '+(sort==="like"?"on":"")+'" data-a="sort" data-v="like">공감순</button></div></div>'
- +(ps.length?ps.map(note).join(""):'<div class="empty">아직 이 분류에는 글이 없어요.<br>첫 이야기를 들려주시겠어요?</div>')}
+ +(ps.length?ps.map(note).join(""):'<div class="empty">아직 이 분류에는 글이 없어요.<br>첫 이야기를 들려주시겠어요?</div>')
+ +(hasMore?'<div class="row" style="justify-content:center;margin-top:16px"><button class="btn ghost" data-a="more">글 더 보기</button></div>':'')}
 function note(p){var o=openId===p.id,ci=CATS.indexOf(p.cat)+1,cm=p.cm.filter(function(c){return !c.h});
  var s='<article class="note cat'+ci+'"><div class="meta"><span>'+esc(p.cat)+'</span><span>'+ago(p.ts)+'</span></div><h3>'+esc(p.t)+'</h3><p class="txt'+(o?"":" clamp")+'">'+esc(p.c)+'</p>'
  +'<div class="rx">'+RX.map(function(r){return'<button class="'+(st.my[p.id+r[0]]?"me":"")+'" data-a="rx" data-id="'+p.id+'" data-v="'+r[0]+'" aria-pressed="'+!!st.my[p.id+r[0]]+'">'+r[1]+" "+p.r[r[0]]+'</button>'}).join("")+'</div>'
@@ -130,9 +137,14 @@ function rules(){return'<h2 class="pg">이용 규칙</h2><p class="hint">여기�
  +'<div class="box warn"><b>이런 글은 올릴 수 없어요</b><ul><li>실명, 전화번호, 주소, 계정·아이디, 회사·학교 이름 등 개인을 알아볼 수 있는 정보</li><li>특정인을 괴롭히거나 위협하는 글</li><li>성별, 지역, 나이, 장애, 출신 등에 대한 혐오 표현</li><li>보복이나 신상 공개를 부추기는 내용</li><li>광고, 링크, 반복 도배</li></ul></div>'
  +'<div class="box"><b>이렇게 써주세요</b><ul><li>상대의 이름 대신 “상사”, “옆자리 손님”처럼 바꿔 써요.</li><li>누가 봐도 알 만한 시간, 장소, 사건 정보는 조금 바꾸거나 빼요.</li><li>상대를 평가하기보다 내가 겪은 일과 내 마음을 중심으로 써요.</li></ul></div>'
  +'<div class="box"><b>댓글은 이렇게 남겨요</b><ul><li>조언을 강요하기보다 먼저 공감해 주세요.</li><li>“그 정도로 뭘”처럼 마음을 가볍게 여기는 말은 삼가요.</li></ul></div>'
- +'<div class="box"><b>신고와 조치</b><p style="margin:6px 0 0">규칙에 어긋나는 글이나 댓글은 신고할 수 있어요. 신고가 3건 이상 쌓이면 운영자가 확인하는 동안 글이 임시로 가려지고, 검토 후 숨김, 삭제 또는 복구 여부를 결정해요.</p></div>'
+ +'<div class="box"><b>신고와 조치</b><p style="margin:6px 0 0">규칙에 어긋나는 글이나 댓글은 신고할 수 있어요. 서로 다른 3명 이상이 신고하면 글이나 댓글이 자동으로 가려져요. 한 사람이 같은 글을 여러 번 신고해도 1건으로 세어요. 가려진 글은 운영자가 검토해 삭제하거나 복구해요.</p></div>'
  +'<div class="box warn"><b>마음이 많이 힘들다면</b><p style="margin:6px 0 0">혼자 견디기 어려운 상황이라면 자살예방상담전화 109(24시간)나 정신건강상담전화 1577-0199에 연락해 보세요.</p></div>'
  +'<button class="btn" data-a="write">규칙을 확인했어요, 글쓰기</button>'}
+function privacy(){return'<h2 class="pg">개인정보처리방침</h2><p class="hint">불편한 게시판이 어떤 정보를 받고 어떻게 쓰는지 알려드려요.</p>'
+ +'<div class="box"><b>받는 정보</b><ul><li>익명으로 이용할 때: 브라우저마다 자동으로 만들어지는 임시 계정 ID</li><li>이메일로 가입할 때: 이메일 주소, 비밀번호(암호화되어 저장돼요)</li><li>Google로 로그인할 때: Google이 전달하는 이메일 주소와 프로필 정보</li><li>이용하면서: 직접 쓴 글, 댓글, 공감, 신고 내용</li></ul></div>'
+ +'<div class="box"><b>쓰는 목적</b><ul><li>로그인과 본인 글·댓글 삭제 권한 확인</li><li>게시판 운영과 신고 처리, 도배 방지</li></ul></div>'
+ +'<div class="box"><b>보관과 삭제</b><ul><li>정보는 Supabase(데이터베이스 서비스)에 저장돼요.</li><li>글과 댓글은 작성자가 직접 삭제할 수 있어요. 삭제하면 해당 글의 댓글과 공감도 함께 지워져요.</li><li>이메일 주소는 다른 이용자에게 보이지 않아요. 댓글과 글은 익명으로 표시돼요.</li><li>계정 삭제를 원하면 운영자에게 요청해 주세요.</li></ul></div>'
+ +'<div class="box"><b>제3자 제공</b><p style="margin:6px 0 0">법령에 따른 경우를 제외하고 받은 정보를 외부에 제공하지 않아요. 로그인에는 Google, 데이터 저장에는 Supabase를 이용해요.</p></div>'}
 function admin(){
  var h='<h2 class="pg">신고·관리</h2><p class="hint">신고 내역은 Supabase 대시보드의 board_reports에서 확인할 수 있어요. 운영자 권한을 웹페이지에 공개하지 않도록 조치 버튼은 운영자 전용 설정 후 연결합니다.</p>';
  return h+'<div class="box"><b>공유 데이터베이스 연결됨</b><p style="margin:6px 0 0">현재 게시판에 표시된 글 '+st.posts.length+'개</p></div>'
@@ -149,7 +161,7 @@ function authModal(mode,email){
   :'<p class="hint">'+(mode==="password"?"사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
    +'<label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" minlength="8" placeholder="8자 이상">'+(mode==="password"?'<label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">':'');
  var action=mode==="signup"?"가입하기":mode==="password"?"비밀번호 저장":"로그인";
- var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" type="button"><span class="google-mark" aria-hidden="true">G</span>Google로 계속하기</button><p class="hint">Google 가입 시 기존 익명 임시 계정의 글·댓글 작성자 권한은 이어지지 않을 수 있어요.</p></div>';
+ var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" type="button"><span class="google-mark" aria-hidden="true">G</span>Google로 계속하기</button><p class="hint">이 브라우저에서 익명으로 쓴 글과 댓글은 Google 계정으로 이어져요.</p></div>';
  modal('<h2>'+title+'</h2>'+switcher+body+google+'<div class="err" id="aeerr" aria-live="polite"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="authsubmit" data-v="'+mode+'">'+action+'</button></div>')
 }
 function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
@@ -167,26 +179,32 @@ function fp(id){return st.posts.filter(function(p){return p.id==id})[0]}
 function voter(){return currentUserId}
 function reportMap(rows,key){var out={};rows.forEach(function(r){var k=key(r);(out[k]||(out[k]=[])).push(r.reason)});return out}
 async function refresh(){
- var results=await Promise.all([
-  sb.from("board_posts").select("*").order("created_at",{ascending:false}),
-  sb.from("board_comments").select("*").order("created_at"),
-  sb.from("board_reactions").select("*")
- ]);
- var err=results.filter(function(x){return x.error})[0];if(err)throw err.error;
- var comments=results[1].data||[],reactions=results[2].data||[];
- var my={},posts=(results[0].data||[]).map(function(row){var p={id:row.id,author_id:row.author_id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
+ var q=sb.from("board_posts").select("*").order("created_at",{ascending:false}).range(0,postLimit);
+ if(cat!=="전체")q=q.eq("category",cat);
+ var pr=await q;if(pr.error)throw pr.error;
+ var rows=pr.data||[];hasMore=rows.length>postLimit;rows=rows.slice(0,postLimit);
+ var ids=rows.map(function(r){return r.id}),comments=[],reactions=[];
+ if(ids.length){
+  var results=await Promise.all([
+   sb.from("board_comments").select("*").in("post_id",ids).order("created_at"),
+   sb.from("board_reactions").select("*").in("post_id",ids)
+  ]);
+  var err=results.filter(function(x){return x.error})[0];if(err)throw err.error;
+  comments=results[0].data||[];reactions=results[1].data||[];
+ }
+ var my={},posts=rows.map(function(row){var p={id:row.id,author_id:row.author_id,t:row.title,c:row.body,cat:row.category,ts:Date.parse(row.created_at),h:row.hidden,r:{a:0,b:0,c:0},cm:[],rp:[]};
   reactions.filter(function(r){return r.post_id===row.id}).forEach(function(r){p.r[r.reaction]++;if(r.voter_key===voter())my[p.id+r.reaction]=1});
   p.cm=comments.filter(function(c){return c.post_id===row.id}).map(function(c){return{id:c.id,author_id:c.author_id,t:c.body,ts:Date.parse(c.created_at),h:c.hidden,rp:[]}});return p});
  st={n:0,my:my,posts:posts};render();
 }
-function dbError(err){console.error("Supabase request failed",err);toast("연결 오류: Supabase 설정과 테이블을 확인해 주세요.")}
+function dbError(err){console.error("Supabase request failed",err);var m=err&&err.message||"";if(err&&err.code==="23505"){toast("이미 신고하셨어요.");return}if(/rate limit/i.test(m)){toast("잠시 쉬었다가 다시 올려주세요. 짧은 시간에 너무 많이 올렸어요.");return}toast("연결 오류: 잠시 후 다시 시도해 주세요.")}
 async function send(action){try{await action();await refresh();return true}catch(err){dbError(err);return false}}
 document.addEventListener("click",async function(e){var b=e.target.closest("[data-a]");if(!b){if(e.target.id==="ov")closeM();return}
  var a=b.dataset.a,id=b.dataset.id,cid=b.dataset.c,p=id?fp(id):null;
  if(a==="x"){closeM();return}
  if(a==="auth"){var pending=pendingEmail();authModal(pending&&currentUserId&&!currentIsAnonymous?"password":currentIsAnonymous?"login":"account",pending||currentUserEmail);return}
  if(a==="authmode"){authModal(b.dataset.v);return}
- if(a==="googleauth"){if(authBusy)return;authBusy=true;b.disabled=true;try{var oauth=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}});if(oauth.error)throw oauth.error}catch(err){authBusy=false;b.disabled=false;var googleErr=document.getElementById("aeerr");if(googleErr)googleErr.textContent=authMessage(err)}return}
+ if(a==="googleauth"){if(authBusy)return;authBusy=true;b.disabled=true;try{var oauth;if(currentUserId&&currentIsAnonymous){oauth=await sb.auth.linkIdentity({provider:"google",options:{redirectTo:SITE_URL}});if(oauth.error)oauth=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}})}else{oauth=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}})}if(oauth.error)throw oauth.error}catch(err){authBusy=false;b.disabled=false;var googleErr=document.getElementById("aeerr");if(googleErr)googleErr.textContent=authMessage(err)}return}
  if(a==="authout"){if(authBusy)return;if(!confirm("로그아웃할까요?"))return;authBusy=true;try{await sb.auth.signOut();var anon=await sb.auth.signInAnonymously();if(anon.error)throw anon.error;setUserSession(anon.data.session);await refresh();closeM();toast("로그아웃했어요.")}catch(err){toast(authMessage(err))}finally{authBusy=false}return}
  if(a==="authsubmit"){
   if(authBusy)return;var mode=b.dataset.v,email=(mode==="password"?currentUserEmail:(document.getElementById("ae")||{}).value||"").trim().toLowerCase(),pass=(document.getElementById("ap")||{}).value||"",errBox=document.getElementById("aeerr");
@@ -202,7 +220,8 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
   }catch(err){var box=document.getElementById("aeerr");if(box)box.textContent=authMessage(err);var submit=document.querySelector('[data-a="authsubmit"]');if(submit)submit.disabled=false}finally{authBusy=false}return
  }
  if(a==="write"){wr();return}
- if(a==="cat"){cat=b.dataset.v}
+ if(a==="cat"){cat=b.dataset.v;postLimit=20;await send(async function(){})}
+ else if(a==="more"){postLimit+=20;await send(async function(){})}
  else if(a==="sort"){sort=b.dataset.v}
  else if(a==="open"){openId=openId==p.id?null:p.id}
  else if(a==="rx"){var k=p.id+b.dataset.v,v=b.dataset.v,removing=!!st.my[k];if(!currentUserId){toast("잠시 후 다시 눌러주세요.")}else if(await send(async function(){var q=removing?await sb.from("board_reactions").delete().eq("post_id",p.id).eq("reaction",v).eq("voter_key",voter()):await sb.from("board_reactions").insert({post_id:p.id,reaction:v,voter_key:voter()});if(q.error)throw q.error}))toast(removing?"공감을 취소했어요.":"공감이 전달됐어요.")}
@@ -221,7 +240,6 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
   if(!document.getElementById("wa").checked){er.textContent="글을 올리려면 이용 규칙에 동의해 주세요.";return}
   posting=true;b.disabled=true;var didPost=await send(async function(){var x=await sb.from("board_posts").insert({title:t,body:c,category:document.getElementById("wc").value});if(x.error)throw x.error});posting=false;
   if(didPost){postCooldownUntil=Date.now()+2500;closeM();location.hash="";sort="new";cat="전체";toast("털어놓아 주셔서 고마워요. 글이 올라갔어요.")}else b.disabled=false}
- else if(a==="ok"||a==="hide"||a==="del"){toast("운영자 권한이 필요한 기능이에요. Supabase 대시보드에서 처리해 주세요.")}
  render()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
 window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});

@@ -101,3 +101,59 @@ do $$ begin
   alter publication supabase_realtime add table public.board_reactions;
 exception when duplicate_object then null;
 end $$;
+
+-- ===== Reports: one per visitor, auto-hide at 3 distinct reporters; write rate limits =====
+alter table public.board_reports add column if not exists reporter_id uuid default auth.uid();
+update public.board_reports set reporter_id = gen_random_uuid() where reporter_id is null;
+alter table public.board_reports alter column reporter_id set not null;
+
+create unique index if not exists board_reports_one_per_reporter
+  on public.board_reports (reporter_id, post_id, coalesce(comment_id, '00000000-0000-0000-0000-000000000000'::uuid));
+
+drop policy if exists "Anyone can submit reports" on public.board_reports;
+drop policy if exists "Signed-in visitors can submit reports" on public.board_reports;
+create policy "Signed-in visitors can submit reports" on public.board_reports
+  for insert to authenticated with check (reporter_id = auth.uid());
+revoke insert on public.board_reports from anon;
+
+create or replace function public.board_apply_report_threshold() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.comment_id is not null then
+    if (select count(distinct reporter_id) from public.board_reports where comment_id = new.comment_id) >= 3 then
+      update public.board_comments set hidden = true where id = new.comment_id;
+    end if;
+  else
+    if (select count(distinct reporter_id) from public.board_reports where post_id = new.post_id and comment_id is null) >= 3 then
+      update public.board_posts set hidden = true where id = new.post_id;
+    end if;
+  end if;
+  return new;
+end $$;
+revoke execute on function public.board_apply_report_threshold() from public, anon, authenticated;
+
+drop trigger if exists board_reports_threshold on public.board_reports;
+create trigger board_reports_threshold after insert on public.board_reports
+  for each row execute function public.board_apply_report_threshold();
+
+create or replace function public.board_rate_limit() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  if tg_table_name = 'board_posts' then
+    select count(*) into n from public.board_posts where author_id = new.author_id and created_at > now() - interval '1 hour';
+    if n >= 5 then raise exception 'rate limit: too many posts'; end if;
+  elsif tg_table_name = 'board_comments' then
+    select count(*) into n from public.board_comments where author_id = new.author_id and created_at > now() - interval '1 hour';
+    if n >= 30 then raise exception 'rate limit: too many comments'; end if;
+  end if;
+  return new;
+end $$;
+revoke execute on function public.board_rate_limit() from public, anon, authenticated;
+
+drop trigger if exists board_posts_rate_limit on public.board_posts;
+create trigger board_posts_rate_limit before insert on public.board_posts
+  for each row execute function public.board_rate_limit();
+drop trigger if exists board_comments_rate_limit on public.board_comments;
+create trigger board_comments_rate_limit before insert on public.board_comments
+  for each row execute function public.board_rate_limit();
