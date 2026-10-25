@@ -161,11 +161,12 @@ function authModal(mode,email){
   :'<p class="hint">'+(mode==="password"?"사용할 비밀번호를 설정해 주세요.":"가입한 이메일과 비밀번호로 로그인해 주세요.")+'</p>'+(mode==="password"?'<p class="hint">'+esc(email||currentUserEmail)+'</p>':'<label for="ae">이메일</label><input id="ae" type="email" autocomplete="email" maxlength="254" placeholder="you@example.com">')
    +'<label for="ap">비밀번호</label><input id="ap" type="password" autocomplete="'+(mode==="login"?"current-password":"new-password")+'" minlength="8" placeholder="8자 이상">'+(mode==="password"?'<label for="ap2">비밀번호 확인</label><input id="ap2" type="password" autocomplete="new-password" minlength="8" placeholder="비밀번호를 다시 입력">':'');
  var action=mode==="signup"?"가입하기":mode==="password"?"비밀번호 저장":"로그인";
- var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" type="button"><span class="google-mark" aria-hidden="true">G</span>Google로 계속하기</button><p class="hint">이 브라우저에서 익명으로 쓴 글과 댓글은 Google 계정으로 이어져요.</p></div>';
+ var google=mode==="password"?'':'<div style="margin:16px 0 6px"><button class="btn google" data-a="googleauth" type="button"><span class="google-mark" aria-hidden="true">G</span>Google로 계속하기</button><p class="hint">처음 쓰는 Google 계정이면 이 브라우저에서 익명으로 쓴 글과 댓글이 이어져요. 이미 가입한 계정으로 로그인하면 이어지지 않아요.</p></div>';
  modal('<h2>'+title+'</h2>'+switcher+body+google+'<div class="err" id="aeerr" aria-live="polite"></div><div class="row"><button class="btn ghost" data-a="x">취소</button><button class="btn" data-a="authsubmit" data-v="'+mode+'">'+action+'</button></div>')
 }
 function authMessage(err){var m=err&&err.message||"요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.";if(/already registered|already exists/i.test(m))return"이미 가입된 이메일이에요. 로그인해 주세요.";if(/invalid login credentials/i.test(m))return"이메일 또는 비밀번호가 맞지 않아요.";if(/password should be|at least/i.test(m))return"비밀번호는 8자 이상으로 입력해 주세요.";if(/rate limit|too many/i.test(m))return"요청이 잠시 제한됐어요. 조금 뒤 다시 시도해 주세요.";return m}
 function setUserSession(session){var u=session&&session.user;currentUserId=u?u.id:null;currentUserEmail=u&&u.email||"";currentIsAnonymous=!u||!!u.is_anonymous}
+function oauthReturnError(){var q=new URLSearchParams(location.search),h=new URLSearchParams(location.hash.replace(/^#/,""));return q.get("error_description")||h.get("error_description")||""}
 function pendingEmail(){try{return localStorage.getItem("painboard_pending_email")}catch(e){return""}}
 function wr(){modal('<h2>오늘의 불편함 털어놓기</h2><p class="hint">익명으로 올라가요. 마음 편히 써주세요.</p>'
  +'<div class="box warn" style="font-size:14px;margin:10px 0"><b>올리기 전에 확인해 주세요</b><ul style="margin:6px 0 0"><li>실명, 전화번호, 주소, 계정 정보는 쓰지 마세요.</li><li>상대의 이름이나 알아볼 만한 세부 정보는 “상사”, “손님”처럼 바꿔 쓰거나 빼주세요.</li><li>특정인을 괴롭히거나 위협하는 글, 혐오 표현, 보복을 부추기는 글은 올릴 수 없어요.</li></ul></div>'
@@ -244,7 +245,14 @@ document.addEventListener("click",async function(e){var b=e.target.closest("[dat
 document.addEventListener("keydown",function(e){if(e.key==="Escape")closeM()});
 window.addEventListener("hashchange",function(){closeM();render();window.scrollTo(0,0)});
 st={n:0,my:{},posts:[]};render();
-async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();var pending=pendingEmail();if(pending&&session.user&&!session.user.is_anonymous&&session.user.email&&session.user.email.toLowerCase()===pending.toLowerCase())setTimeout(function(){authModal("password",pending)},250)}
+async function startBoard(){var result=await sb.auth.getSession();if(result.error)throw result.error;var session=result.data.session;if(!session){var signed=await sb.auth.signInAnonymously();if(signed.error)throw signed.error;session=signed.data.session}setUserSession(session);await refresh();
+ var oe=oauthReturnError();
+ if(oe){try{history.replaceState(null,"",location.pathname)}catch(e){}
+  var retried="";try{retried=sessionStorage.getItem("painboard_oauth_retry")}catch(e){}
+  if(/already|linked|exists|identity/i.test(oe)&&!retried){try{sessionStorage.setItem("painboard_oauth_retry","1")}catch(e){}toast("이미 가입된 Google 계정이에요. 로그인으로 이어갈게요.");var again=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:SITE_URL}});if(again.error)toast(authMessage(again.error));return}
+  toast("Google 로그인에 실패했어요. 잠시 후 다시 시도해 주세요.")}
+ else if(!currentIsAnonymous){try{sessionStorage.removeItem("painboard_oauth_retry")}catch(e){}}
+ var pending=pendingEmail();if(pending&&session.user&&!session.user.is_anonymous&&session.user.email&&session.user.email.toLowerCase()===pending.toLowerCase())setTimeout(function(){authModal("password",pending)},250)}
 startBoard().catch(function(e){dbError(e)});
 sb.channel("board-live-updates").on("postgres_changes",{event:"*",schema:"public",table:"board_posts"},function(){refresh().catch(dbError)})
  .on("postgres_changes",{event:"*",schema:"public",table:"board_comments"},function(){refresh().catch(dbError)})
